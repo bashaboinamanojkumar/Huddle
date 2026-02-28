@@ -312,7 +312,7 @@ export default function SettingsPage() {
                     <ChevronRight className="h-4 w-4 text-muted-foreground" />
                   </button>
                 ))}
-                <p className="mt-4 text-center text-xs text-muted-foreground">Hudrdle v1.0.0</p>
+                <p className="mt-4 text-center text-xs text-muted-foreground">Huddle v1.0.0</p>
                 <p className="text-center text-xs text-muted-foreground">Built with care by UMD students</p>
               </div>
             </div>

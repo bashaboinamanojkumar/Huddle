@@ -52,10 +52,10 @@ const badgeCategories = [
   {
     name: "Milestone Badges",
     badges: [
-      { name: "1 Month Member", description: "Been part of Hudrdle for 1 month", icon: "cake", earned: true, earnedDate: "Feb 15, 2026" },
+      { name: "1 Month Member", description: "Been part of Huddle for 1 month", icon: "cake", earned: true, earnedDate: "Feb 15, 2026" },
       { name: "3 Month Veteran", description: "A committed community member", icon: "medal-silver", earned: false, progress: 1, total: 3 },
       { name: "6 Month Champion", description: "Half a year of wellness", icon: "medal-gold", earned: false, progress: 1, total: 6 },
-      { name: "1 Year Terp", description: "A full year with Hudrdle", icon: "diamond", earned: false, progress: 1, total: 12 },
+      { name: "1 Year Terp", description: "A full year with Huddle", icon: "diamond", earned: false, progress: 1, total: 12 },
     ],
   },
 ]
@@ -89,7 +89,7 @@ export default function AchievementsPage() {
       {/* Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="font-heading text-2xl font-bold text-navy">Your Hudrdle Journey</h1>
+          <h1 className="font-heading text-2xl font-bold text-navy">Your Huddle Journey</h1>
           <p className="mt-1 text-muted-foreground">Track your growth and celebrate milestones</p>
         </div>
         <div className="flex items-center gap-2 rounded-full bg-secondary/10 px-4 py-2">

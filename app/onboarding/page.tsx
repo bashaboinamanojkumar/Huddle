@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { HudrdleLogoFull } from "@/components/hudrdle-logo"
+import { HuddleLogoFull } from "@/components/huddle-logo"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
@@ -90,7 +90,7 @@ export default function OnboardingPage() {
           <h1 className="mt-8 font-heading text-3xl font-bold text-white">
             You{"'"}re all set, {name || "friend"}!
           </h1>
-          <p className="mt-2 text-white/70">Your Hudrdle is ready</p>
+          <p className="mt-2 text-white/70">Your Huddle is ready</p>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
             {[
               { title: "Meet Your First Match", href: "/app/matching" },
@@ -121,7 +121,7 @@ export default function OnboardingPage() {
     <div className="flex min-h-screen flex-col bg-card">
       {/* Header */}
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <HudrdleLogoFull className="text-navy" />
+        <HuddleLogoFull className="text-navy" />
         <button
           onClick={() => router.push("/app")}
           className="text-sm text-muted-foreground hover:text-navy"

@@ -31,13 +31,13 @@ const featuredResource = {
 const resources = [
   { id: 1, type: "Article", title: "Understanding Anxiety: What It Is and How to Cope", source: "NIMH", readTime: "5 min", tags: ["Anxiety", "Self-Help"], category: "anxiety", saved: false },
   { id: 2, type: "Video", title: "5-Minute Guided Meditation for Students", source: "UMD Wellness", readTime: "5 min", tags: ["Mindfulness", "Video"], category: "mindfulness", saved: false },
-  { id: 3, type: "Tool", title: "4-7-8 Breathing Exercise", source: "Hudrdle", readTime: "Interactive", tags: ["Breathing", "Calm"], category: "mindfulness", saved: true },
+  { id: 3, type: "Tool", title: "4-7-8 Breathing Exercise", source: "Huddle", readTime: "Interactive", tags: ["Breathing", "Calm"], category: "mindfulness", saved: true },
   { id: 4, type: "Article", title: "Sleep Hygiene Tips for College Students", source: "NIH", readTime: "7 min", tags: ["Sleep", "Wellness"], category: "sleep", saved: false },
   { id: 5, type: "Hotline", title: "988 Suicide & Crisis Lifeline", source: "SAMHSA", readTime: "24/7", tags: ["Crisis", "Emergency"], category: "crisis", saved: true },
   { id: 6, type: "PDF", title: "First-Gen Student Resource Guide", source: "UMD CARE", readTime: "15 min", tags: ["First-Gen", "Academic"], category: "academic", saved: false },
   { id: 7, type: "Video", title: "Progressive Muscle Relaxation", source: "APA", readTime: "12 min", tags: ["Relaxation", "Body"], category: "physical", saved: false },
   { id: 8, type: "Article", title: "LGBTQ+ Mental Health Resources at UMD", source: "UMD LGBTQ+ Equity Center", readTime: "6 min", tags: ["LGBTQ+", "Support"], category: "lgbtq", saved: false },
-  { id: 9, type: "Tool", title: "Grounding Technique: 5-4-3-2-1", source: "Hudrdle", readTime: "Interactive", tags: ["Grounding", "Anxiety"], category: "anxiety", saved: false },
+  { id: 9, type: "Tool", title: "Grounding Technique: 5-4-3-2-1", source: "Huddle", readTime: "Interactive", tags: ["Grounding", "Anxiety"], category: "anxiety", saved: false },
 ]
 
 const crisisResources = [

@@ -24,7 +24,7 @@ export default function LoginPage() {
   return (
     <AuthLayout
       footerLink={{ href: "/signup", label: "Sign up" }}
-      footerText="New to Hudrdle?"
+      footerText="New to Huddle?"
     >
       <h1 className="font-heading text-2xl font-bold text-navy md:text-3xl">Welcome Back</h1>
       <p className="mt-2 text-muted-foreground">We missed you</p>
@@ -106,7 +106,7 @@ export default function LoginPage() {
         </button>
 
         <p className="text-center text-sm text-muted-foreground">
-          New to Hudrdle?{" "}
+          New to Huddle?{" "}
           <Link href="/signup" className="text-secondary hover:underline">Sign up</Link>
         </p>
       </form>

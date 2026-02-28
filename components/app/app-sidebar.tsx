@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { HudrdleLogo } from "@/components/hudrdle-logo"
+import { HuddleLogo } from "@/components/huddle-logo"
 import {
   Home, Users, MessageCircle, Handshake, BookOpen, Calendar, Trophy,
   User, Settings, AlertTriangle, Flame,
@@ -26,8 +26,8 @@ export function AppSidebar() {
     <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
       {/* Logo */}
       <div className="flex items-center gap-2 px-6 py-5">
-        <HudrdleLogo size={28} />
-        <span className="font-heading text-lg font-bold text-sidebar-foreground">Hudrdle</span>
+        <HuddleLogo size={28} />
+        <span className="font-heading text-lg font-bold text-sidebar-foreground">Huddle</span>
       </div>
 
       {/* User Info */}

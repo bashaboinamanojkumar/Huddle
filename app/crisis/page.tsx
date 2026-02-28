@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import { Phone, MessageCircle, Building2, ArrowLeft, Heart, Shield, ChevronDown, ChevronUp, Send, ExternalLink } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
-import { HudrdleLogo } from "@/components/hudrdle-logo"
+import { HuddleLogo } from "@/components/huddle-logo"
 
 const safetyPlanSteps = [
   { question: "What are my warning signs?", placeholder: "e.g., Feeling isolated, not sleeping, skipping meals..." },
@@ -60,7 +60,7 @@ export default function CrisisPage() {
           <ArrowLeft className="h-5 w-5" />
           <span className="text-sm">Back to App</span>
         </Link>
-        <HudrdleLogo size={24} />
+        <HuddleLogo size={24} />
       </header>
 
       <main className="mx-auto max-w-3xl px-4 pb-16 pt-4 md:px-8">

@@ -3,14 +3,14 @@
 import { motion } from "framer-motion"
 import { ArrowDown, MessageCircle, BarChart3, Heart } from "lucide-react"
 import Link from "next/link"
-import { HudrdleLogoFull } from "@/components/hudrdle-logo"
+import { HuddleLogoFull } from "@/components/huddle-logo"
 
 export function HeroSection() {
   return (
     <section className="relative flex min-h-screen flex-col overflow-hidden bg-gradient-to-b from-navy to-dark-navy">
       {/* Navbar */}
       <nav className="relative z-20 flex items-center justify-between px-6 py-4 md:px-12">
-        <HudrdleLogoFull className="text-white" />
+        <HuddleLogoFull className="text-white" />
         <div className="flex items-center gap-4">
           <Link href="/login" className="text-sm font-medium text-white/80 transition-colors hover:text-white">
             Log In
@@ -19,7 +19,7 @@ export function HeroSection() {
             href="/signup"
             className="rounded-full bg-coral px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-coral/90"
           >
-            Join Hudrdle
+            Join Huddle
           </Link>
         </div>
       </nav>
@@ -44,7 +44,7 @@ export function HeroSection() {
               You Don{"'"}t Have to Navigate College Alone
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/70">
-              Hudrdle connects UMD students for real conversations, peer support, and mental
+              Huddle connects UMD students for real conversations, peer support, and mental
               wellness — built by students, for students.
             </p>
             <div className="mt-8 flex flex-wrap gap-4">
@@ -52,7 +52,7 @@ export function HeroSection() {
                 href="/signup"
                 className="rounded-full bg-coral px-8 py-3.5 text-base font-semibold text-white shadow-lg transition-all hover:bg-coral/90 hover:shadow-xl"
               >
-                Join Hudrdle
+                Join Huddle
               </Link>
               <a
                 href="#how-it-works"

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { HudrdleLogoFull } from "@/components/hudrdle-logo"
+import { HuddleLogoFull } from "@/components/huddle-logo"
 import Link from "next/link"
 
 const quotes = [
@@ -33,7 +33,7 @@ export function AuthLayout({
     <div className="flex min-h-screen">
       {/* Left Panel */}
       <div className="hidden w-[40%] flex-col justify-between bg-navy p-10 lg:flex">
-        <HudrdleLogoFull className="text-white" />
+        <HuddleLogoFull className="text-white" />
         <div className="space-y-6">
           <blockquote className="text-xl leading-relaxed text-white/80" style={{ fontFamily: "var(--font-lora)", fontStyle: "italic" }}>
             {'"'}{quotes[quoteIndex].text}{'"'}

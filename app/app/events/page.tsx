@@ -32,7 +32,7 @@ const events = [
   },
   {
     id: 3, name: "Study Break: Game Night", type: "Social Events", date: "Feb 26", time: "7:00 PM",
-    location: "Denton Community Center", host: "Hudrdle Team", attendees: 45, capacity: 60,
+    location: "Denton Community Center", host: "Huddle Team", attendees: 45, capacity: 60,
     tags: ["Social", "Fun"], virtual: false, rsvped: false,
   },
   {

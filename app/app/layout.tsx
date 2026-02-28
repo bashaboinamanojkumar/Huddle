@@ -14,7 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Top Bar */}
         <header className="flex items-center justify-between border-b border-border bg-card px-4 py-3 lg:px-6">
           <div className="flex items-center gap-2 lg:hidden">
-            <span className="font-heading text-lg font-bold text-navy">Hudrdle</span>
+            <span className="font-heading text-lg font-bold text-navy">Huddle</span>
           </div>
           <div className="hidden flex-1 lg:block lg:max-w-md">
             <div className="flex items-center gap-2 rounded-xl bg-muted px-4 py-2">

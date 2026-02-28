@@ -3,14 +3,14 @@
 import { motion } from "framer-motion"
 import { Shield, BookOpen, Users } from "lucide-react"
 import Link from "next/link"
-import { HudrdleLogoFull } from "@/components/hudrdle-logo"
+import { HuddleLogoFull } from "@/components/huddle-logo"
 
 export function PartnershipSection() {
   return (
     <section className="bg-card py-20">
       <div className="mx-auto flex max-w-4xl flex-col items-center gap-8 px-6 text-center">
         <div className="flex items-center gap-6">
-          <HudrdleLogoFull />
+          <HuddleLogoFull />
           <span className="text-2xl text-muted-foreground">+</span>
           <span className="font-heading text-xl font-bold text-navy">UMD</span>
         </div>
@@ -71,7 +71,7 @@ export function Footer() {
     <footer className="bg-dark-navy pb-16 pt-16">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 md:grid-cols-4">
         <div>
-          <HudrdleLogoFull className="text-white" />
+          <HuddleLogoFull className="text-white" />
           <p className="mt-3 text-sm text-white/50">Connect. Share. Heal Together.</p>
         </div>
         <div>

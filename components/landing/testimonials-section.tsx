@@ -6,7 +6,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 
 const testimonials = [
   {
-    quote: "Hudrdle helped me find people who actually understand what I'm going through. It changed my college experience.",
+    quote: "Huddle helped me find people who actually understand what I'm going through. It changed my college experience.",
     name: "Sarah M.",
     info: "UMD Junior, Psychology",
     color: "bg-lavender/30",
@@ -34,7 +34,7 @@ const testimonials = [
     anonymous: true,
   },
   {
-    quote: "As an international student, finding Hudrdle was like finding a second family. The community here is incredible.",
+    quote: "As an international student, finding Huddle was like finding a second family. The community here is incredible.",
     name: "Priya K.",
     info: "UMD Grad Student, Engineering",
     color: "bg-secondary/20",

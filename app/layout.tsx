@@ -8,8 +8,8 @@ const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700
 const lora = Lora({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-lora' })
 
 export const metadata: Metadata = {
-  title: 'Hudrdle - Connect. Share. Heal Together.',
-  description: 'Hudrdle connects UMD students for real conversations, peer support, and mental wellness. Built by students, for students.',
+  title: 'Huddle - Connect. Share. Heal Together.',
+  description: 'Huddle connects UMD students for real conversations, peer support, and mental wellness. Built by students, for students.',
   generator: 'v0.app',
   icons: {
     icon: [
