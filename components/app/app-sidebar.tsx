@@ -3,6 +3,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { HuddleLogo } from "@/components/huddle-logo"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useProfile } from "@/hooks/use-profile"
 import {
   Home, Users, MessageCircle, Handshake, BookOpen, Calendar, Trophy,
   User, Settings, AlertTriangle, Flame,
@@ -21,6 +23,10 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const { user } = useAuth()
+  const { profile } = useProfile(user?.id)
+  const displayName = profile ? `${profile.first_name} ${profile.last_name}`.trim() || profile.email : "You"
+  const initial = displayName.charAt(0).toUpperCase()
 
   return (
     <aside className="hidden w-64 flex-shrink-0 flex-col border-r border-sidebar-border bg-sidebar lg:flex">
@@ -31,15 +37,17 @@ export function AppSidebar() {
       </div>
 
       {/* User Info */}
-      <div className="mx-4 flex items-center gap-3 rounded-xl bg-sidebar-accent p-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-white">
-          A
+      {user && (
+        <div className="mx-4 flex items-center gap-3 rounded-xl bg-sidebar-accent p-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-sm font-bold text-white">
+            {initial}
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-sm font-medium text-sidebar-foreground">{displayName.split(" ")[0]}</p>
+            <p className="text-xs text-sidebar-foreground/60">Feeling Good</p>
+          </div>
         </div>
-        <div className="flex-1">
-          <p className="text-sm font-medium text-sidebar-foreground">Alex T.</p>
-          <p className="text-xs text-sidebar-foreground/60">Feeling Good</p>
-        </div>
-      </div>
+      )}
 
       {/* Streak */}
       <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl bg-sidebar-accent p-3">

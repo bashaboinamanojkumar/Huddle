@@ -5,8 +5,15 @@ import { MobileNav } from "@/components/app/mobile-nav"
 import { CrisisBanner } from "@/components/crisis-banner"
 import { Bell, Search, MessageCircle } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useProfile } from "@/hooks/use-profile"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth()
+  const { profile } = useProfile(user?.id)
+  const initial = profile
+    ? `${profile.first_name} ${profile.last_name}`.trim().charAt(0).toUpperCase() || profile.email.charAt(0).toUpperCase()
+    : "A"
   return (
     <div className="flex min-h-screen bg-background">
       <AppSidebar />
@@ -36,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-coral text-[10px] font-bold text-white">2</span>
             </Link>
             <Link href="/app/profile" className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary text-xs font-bold text-white">
-              A
+              {initial}
             </Link>
           </div>
         </header>

@@ -1,15 +1,25 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { HuddleLogoFull } from "@/components/huddle-logo"
+import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/components/providers/auth-provider"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Check, ArrowLeft, ArrowRight, Camera, Sparkles } from "lucide-react"
+
+const academicYearMap: Record<string, "Freshman" | "Sophomore" | "Junior" | "Senior" | "Graduate" | "PhD"> = {
+  Freshman: "Freshman",
+  Sophomore: "Sophomore",
+  Junior: "Junior",
+  Senior: "Senior",
+  "Grad Student": "Graduate",
+}
 
 const supportReasons = [
   "Peer Support", "Someone to Talk To", "Mental Health Resources", "Academic Stress Help",
@@ -32,6 +42,7 @@ const moods = [
 
 export default function OnboardingPage() {
   const router = useRouter()
+  const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [name, setName] = useState("")
   const [pronouns, setPronouns] = useState("")
@@ -71,7 +82,30 @@ export default function OnboardingPage() {
     }
   }
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
+    if (user) {
+      try {
+        const supabase = createClient()
+        await supabase.from("profiles").update({
+          bio: intention || undefined,
+          major: major || undefined,
+        }).eq("id", user.id)
+
+        const academicYear = year ? academicYearMap[year] ?? null : null
+        await supabase.from("student_details").upsert(
+          {
+            profile_id: user.id,
+            college: "UMD",
+            academic_year: academicYear,
+            interests: selectedHobbies.length > 0 ? selectedHobbies : null,
+            skills: selectedReasons.length > 0 ? selectedReasons : null,
+          },
+          { onConflict: "profile_id" }
+        )
+      } catch (err) {
+        console.error("Failed to save onboarding data:", err)
+      }
+    }
     setComplete(true)
   }
 
@@ -171,7 +205,7 @@ export default function OnboardingPage() {
                     <Select value={year} onValueChange={setYear}>
                       <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select year" /></SelectTrigger>
                       <SelectContent>
-                        {["Freshman", "Sophomore", "Junior", "Senior", "Grad Student"].map((y) => (
+                        {(["Freshman", "Sophomore", "Junior", "Senior", "Grad Student"] as const).map((y) => (
                           <SelectItem key={y} value={y}>{y}</SelectItem>
                         ))}
                       </SelectContent>

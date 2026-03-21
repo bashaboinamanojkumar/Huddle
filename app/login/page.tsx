@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -15,10 +17,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [remember, setRemember] = useState(false)
+  const [loading, setLoading] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    router.push("/app")
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      if (error) throw error
+      toast.success("Welcome back!")
+      router.push("/app")
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to sign in")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -78,9 +93,10 @@ export default function LoginPage() {
 
         <button
           type="submit"
-          className="w-full rounded-xl bg-coral py-3 text-base font-semibold text-white transition-colors hover:bg-coral/90"
+          disabled={loading}
+          className="w-full rounded-xl bg-coral py-3 text-base font-semibold text-white transition-colors hover:bg-coral/90 disabled:opacity-50"
         >
-          Log In
+          {loading ? "Signing in..." : "Log In"}
         </button>
 
         <div className="relative py-4">

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
@@ -8,8 +9,10 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
   User, Shield, Bell, Eye, Accessibility, AlertTriangle, FileText,
-  ChevronRight, Trash2, Download, Lock,
+  ChevronRight, Trash2, Download, Lock, LogOut,
 } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { useAuth } from "@/components/providers/auth-provider"
 
 const settingsCategories = [
   { id: "account", label: "Account", icon: User },
@@ -22,7 +25,16 @@ const settingsCategories = [
 ]
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const { user } = useAuth()
   const [activeCategory, setActiveCategory] = useState("account")
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push("/login")
+    router.refresh()
+  }
   const [settings, setSettings] = useState({
     profileVisibility: "everyone",
     showYearMajor: true,
@@ -87,7 +99,7 @@ export default function SettingsPage() {
                 <div className="mt-4 space-y-4">
                   <div>
                     <Label className="text-sm text-muted-foreground">Email Address</Label>
-                    <Input value="alex.thompson@umd.edu" disabled className="mt-1 rounded-xl bg-muted" />
+                    <Input value={user?.email ?? ""} disabled className="mt-1 rounded-xl bg-muted" />
                     <p className="mt-1 text-xs text-muted-foreground">UMD email cannot be changed</p>
                   </div>
                   <div>
@@ -110,6 +122,12 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+                <button
+                  onClick={handleSignOut}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-border py-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  <LogOut className="h-4 w-4" /> Sign Out
+                </button>
               </div>
               <div className="rounded-2xl border-2 border-destructive/20 bg-card p-5 shadow-sm">
                 <h3 className="flex items-center gap-2 font-heading text-sm font-semibold text-destructive">

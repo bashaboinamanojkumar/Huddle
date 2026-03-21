@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Eye, EyeOff, Lock, Check, X } from "lucide-react"
+import { createClient } from "@/lib/supabase/client"
+import { toast } from "sonner"
 
 function PasswordStrength({ password }: { password: string }) {
   const checks = [
@@ -53,6 +55,15 @@ function PasswordStrength({ password }: { password: string }) {
   )
 }
 
+function splitName(fullName: string): { first_name: string; last_name: string } {
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length === 1) return { first_name: parts[0], last_name: "" }
+  return {
+    first_name: parts[0],
+    last_name: parts.slice(1).join(" "),
+  }
+}
+
 export default function SignUpPage() {
   const router = useRouter()
   const [form, setForm] = useState({ name: "", email: "", password: "", confirmPassword: "" })
@@ -60,6 +71,7 @@ export default function SignUpPage() {
   const [agreed, setAgreed] = useState(false)
   const [isStudent, setIsStudent] = useState(false)
   const [emailError, setEmailError] = useState("")
+  const [loading, setLoading] = useState(false)
 
   const validateEmail = (email: string) => {
     if (email && !email.endsWith("@umd.edu")) {
@@ -69,9 +81,32 @@ export default function SignUpPage() {
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    router.push("/onboarding")
+    if (form.password !== form.confirmPassword) {
+      toast.error("Passwords do not match")
+      return
+    }
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { first_name, last_name } = splitName(form.name)
+      const { error } = await supabase.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: { first_name, last_name },
+        },
+      })
+      if (error) throw error
+      toast.success("Account created! Check your email to confirm, or go to onboarding.")
+      router.push("/onboarding")
+      router.refresh()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create account")
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -170,9 +205,9 @@ export default function SignUpPage() {
         <button
           type="submit"
           className="w-full rounded-xl bg-coral py-3 text-base font-semibold text-white transition-colors hover:bg-coral/90 disabled:opacity-50"
-          disabled={!agreed || !isStudent}
+          disabled={!agreed || !isStudent || loading}
         >
-          Create Account
+          {loading ? "Creating account..." : "Create Account"}
         </button>
 
         <div className="relative py-4">

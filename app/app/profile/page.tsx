@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -9,27 +9,25 @@ import {
   Edit3, Flame, Shield, Users, MessageCircle, Award, FileText,
   Eye, EyeOff, Camera, Save, X, Calendar, Heart,
 } from "lucide-react"
+import { useAuth } from "@/components/providers/auth-provider"
+import { useProfile } from "@/hooks/use-profile"
+import { toast } from "sonner"
 
-const profileData = {
-  name: "Alex Thompson",
+const defaultProfileData = {
+  name: "Anonymous Terp",
   anonymous: false,
-  year: "Junior",
-  major: "Computer Science",
-  joined: "January 2026",
-  streak: 7,
-  level: 7,
-  levelTitle: "Wellness Explorer",
-  bio: "Just a Terp trying to navigate college life one day at a time. Passionate about coding, music, and mental health advocacy. Here because everyone deserves someone who listens.",
-  hereFor: ["Peer Support", "Anxiety Management", "Making Friends", "Academic Stress"],
-  interests: ["Music", "Coding", "Hiking", "Meditation", "Photography", "Gaming"],
+  year: "—",
+  major: "—",
+  joined: "—",
+  streak: 0,
+  level: 1,
+  levelTitle: "New Member",
+  bio: "Share your story when you're ready.",
+  hereFor: [] as string[],
+  interests: [] as string[],
   supportStyle: "Both",
   availability: ["Afternoon", "Evening", "Weekends"],
-  stats: {
-    communities: 5,
-    connections: 12,
-    posts: 23,
-    badges: 8,
-  },
+  stats: { communities: 0, connections: 0, posts: 0, badges: 0 },
 }
 
 const userPosts = [
@@ -62,9 +60,50 @@ const userCommunities = [
 ]
 
 export default function ProfilePage() {
+  const { user } = useAuth()
+  const { profile, studentDetails, loading, updateProfile } = useProfile(user?.id)
   const [editing, setEditing] = useState(false)
-  const [bio, setBio] = useState(profileData.bio)
-  const [anonymousMode, setAnonymousMode] = useState(profileData.anonymous)
+  const [bio, setBio] = useState("")
+  const [anonymousMode, setAnonymousMode] = useState(false)
+
+  const profileData = {
+    ...defaultProfileData,
+    name: profile ? `${profile.first_name} ${profile.last_name}`.trim() || profile.email : defaultProfileData.name,
+    year: studentDetails?.academic_year ?? defaultProfileData.year,
+    major: profile?.major ?? defaultProfileData.major,
+    joined: profile?.created_at ? new Date(profile.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" }) : defaultProfileData.joined,
+    bio: profile?.bio ?? defaultProfileData.bio,
+    hereFor: (studentDetails?.skills ?? []) as string[],
+    interests: (studentDetails?.interests ?? []) as string[],
+    stats: { ...defaultProfileData.stats },
+  }
+
+  useEffect(() => {
+    setBio(profile?.bio ?? defaultProfileData.bio)
+  }, [profile?.bio])
+
+  const handleSaveBio = async () => {
+    try {
+      await updateProfile({ bio })
+      setEditing(false)
+      toast.success("Profile updated")
+    } catch {
+      toast.error("Failed to update profile")
+    }
+  }
+
+  if (loading || !user) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-6 lg:px-6">
+        <div className="animate-pulse rounded-2xl bg-muted h-64" />
+        <div className="mt-4 grid grid-cols-4 gap-3">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-20 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-6 lg:px-6">
@@ -77,7 +116,7 @@ export default function ProfilePage() {
           {/* Avatar */}
           <div className="relative mx-auto h-24 w-24">
             <div className="flex h-24 w-24 items-center justify-center rounded-full bg-coral text-3xl font-bold text-white ring-4 ring-mint">
-              {anonymousMode ? "?" : "A"}
+              {anonymousMode ? "?" : profileData.name.charAt(0).toUpperCase()}
             </div>
             <button
               className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full bg-card text-navy shadow-sm"
@@ -163,7 +202,7 @@ export default function ProfilePage() {
                 <Textarea value={bio} onChange={(e) => setBio(e.target.value)} rows={3} className="rounded-xl" maxLength={250} />
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-xs text-muted-foreground">{bio.length}/250</span>
-                  <button className="flex items-center gap-1 rounded-full bg-secondary px-4 py-1.5 text-xs font-semibold text-white">
+                  <button onClick={handleSaveBio} className="flex items-center gap-1 rounded-full bg-secondary px-4 py-1.5 text-xs font-semibold text-white">
                     <Save className="h-3 w-3" /> Save
                   </button>
                 </div>
@@ -177,7 +216,7 @@ export default function ProfilePage() {
           <div className="rounded-2xl bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-navy">{"I'm"} Here For</h3>
             <div className="mt-2 flex flex-wrap gap-2">
-              {profileData.hereFor.map(tag => (
+              {(profileData.hereFor.length > 0 ? profileData.hereFor : ["Add your support reasons in onboarding"]).map(tag => (
                 <Badge key={tag} variant="secondary" className="bg-coral/10 text-coral">{tag}</Badge>
               ))}
             </div>
@@ -187,7 +226,7 @@ export default function ProfilePage() {
           <div className="rounded-2xl bg-card p-5 shadow-sm">
             <h3 className="text-sm font-semibold text-navy">My Interests</h3>
             <div className="mt-2 flex flex-wrap gap-2">
-              {profileData.interests.map(interest => (
+              {(profileData.interests.length > 0 ? profileData.interests : ["Add interests in onboarding"]).map(interest => (
                 <Badge key={interest} variant="secondary" className="bg-secondary/10 text-secondary">{interest}</Badge>
               ))}
             </div>
