@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Poppins, Lora } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
-import { AuthProvider } from '@/components/providers/auth-provider'
+import { HuddleProvider } from '@/lib/store/huddle-store'
+import { RegisterServiceWorker } from '@/components/pwa/register-sw'
+import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -10,32 +12,35 @@ const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700
 const lora = Lora({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-lora' })
 
 export const metadata: Metadata = {
-  title: 'Huddle - Connect. Share. Heal Together.',
-  description: 'Huddle connects UMD students for real conversations, peer support, and mental wellness. Built by students, for students.',
-  generator: 'v0.app',
+  title: 'Huddle UMD - Small Groups, Real Plans',
+  description: 'Huddle helps UMD students find small public activities, RSVP, and coordinate safely from an installable phone-first web app.',
+  applicationName: 'Huddle',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'Huddle',
+  },
+  formatDetection: {
+    telephone: false,
+  },
   icons: {
     icon: [
-      {
-        url: '/icon-light-32x32.png',
-        media: '(prefers-color-scheme: light)',
-      },
-      {
-        url: '/icon-dark-32x32.png',
-        media: '(prefers-color-scheme: dark)',
-      },
       {
         url: '/icon.svg',
         type: 'image/svg+xml',
       },
     ],
-    apple: '/apple-icon.png',
+    apple: '/icons/icon-192x192.png',
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: '#1B3A6B',
+  themeColor: '#07080d',
   width: 'device-width',
   initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -44,13 +49,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="dark">
       <body className={`${inter.variable} ${poppins.variable} ${lora.variable} font-sans antialiased`}>
-        <AuthProvider>
+        <HuddleProvider>
           {children}
+          <RegisterServiceWorker />
+          <InstallPrompt />
           <Analytics />
           <Toaster position="top-center" richColors />
-        </AuthProvider>
+        </HuddleProvider>
       </body>
     </html>
   )

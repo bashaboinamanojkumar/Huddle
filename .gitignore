@@ -10,3 +10,8 @@ node_modules/
 .DS_Store
 .env*
 .env
+.cursor/
+Huddle_Build_Detailed.md.docx
+_docx_extracted.xml
+_plan.txt
+/supabase/

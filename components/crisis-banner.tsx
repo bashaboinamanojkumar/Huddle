@@ -1,22 +1,22 @@
 "use client"
 
-import { Phone } from "lucide-react"
+import { ShieldAlert } from "lucide-react"
 import Link from "next/link"
 
 export function CrisisBanner() {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-dark-navy py-2 px-4">
-      <div className="mx-auto flex max-w-7xl items-center justify-between">
-        <p className="text-xs text-white/80">
-          Need immediate help? Call <span className="font-semibold text-white">988</span> or Text{" "}
-          <span className="font-semibold text-white">HOME to 741741</span>
+    <div className="fixed inset-x-0 bottom-0 z-50 border-t border-coral/20 bg-black/85 px-4 py-2 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-md items-center justify-between gap-3">
+        <p className="text-xs leading-5 text-white/70">
+          Need immediate help? Call <span className="font-semibold text-white">911</span> or{" "}
+          <span className="font-semibold text-white">988</span>.
         </p>
         <Link
           href="/crisis"
-          className="flex items-center gap-1.5 rounded-full bg-coral px-3 py-1 text-xs font-semibold text-white transition-colors hover:bg-coral/90"
+          className="flex shrink-0 items-center gap-1.5 rounded-full bg-coral px-3 py-2 text-xs font-bold text-white"
         >
-          <Phone className="h-3 w-3" />
-          Get Help Now
+          <ShieldAlert className="h-3.5 w-3.5" />
+          Safety
         </Link>
       </div>
     </div>
