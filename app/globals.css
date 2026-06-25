@@ -159,6 +159,16 @@
   padding-top: max(1rem, env(safe-area-inset-top));
 }
 
+.ios-safe-pt {
+  padding-top: 1.25rem;
+}
+
+@supports (-webkit-touch-callout: none) {
+  .ios-safe-pt {
+    padding-top: max(3rem, env(safe-area-inset-top));
+  }
+}
+
 .glass-card {
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.055));

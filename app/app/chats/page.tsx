@@ -9,7 +9,7 @@ export default function ChatsPage() {
   const { chatActivities, state } = useHuddle()
 
   return (
-    <div className="min-h-full bg-background px-5 py-5">
+    <div className="ios-safe-pt min-h-full bg-background px-5 pb-5">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary">Coordinate</p>
         <h1 className="mt-1 font-heading text-3xl font-black text-white">Group chats</h1>

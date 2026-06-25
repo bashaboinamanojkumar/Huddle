@@ -19,7 +19,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-full bg-background px-5 py-5">
+    <div className="ios-safe-pt min-h-full bg-background px-5 pb-5">
       <header className="glass-card rounded-[2rem] p-5">
         <div className="flex items-center gap-4">
           <div

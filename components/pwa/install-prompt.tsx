@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Download, X } from "lucide-react"
+import { Download, Share, X } from "lucide-react"
 import { featureFlags } from "@/lib/config/flags"
 
 type BeforeInstallPromptEvent = Event & {
@@ -14,6 +14,13 @@ function isStandalone(): boolean {
   return window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as Navigator & { standalone?: boolean }).standalone)
 }
 
+function isIosDevice(): boolean {
+  if (typeof window === "undefined") return false
+  const ua = navigator.userAgent.toLowerCase()
+  const iPadOSDesktopMode = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1
+  return /iphone|ipad|ipod/.test(ua) || iPadOSDesktopMode
+}
+
 export function InstallPrompt() {
   const [promptEvent, setPromptEvent] = useState<BeforeInstallPromptEvent | null>(null)
   const [showIosHint, setShowIosHint] = useState(false)
@@ -24,17 +31,19 @@ export function InstallPrompt() {
       return
     }
 
-    const handler = (event: Event) => {
-      event.preventDefault()
-      setPromptEvent(event as BeforeInstallPromptEvent)
-    }
-
-    window.addEventListener("beforeinstallprompt", handler)
-
-    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const isIos = isIosDevice()
     const alreadyDismissed = window.localStorage.getItem("huddle.install.dismissed") === "true"
     setDismissed(alreadyDismissed)
     setShowIosHint(isIos && !alreadyDismissed)
+
+    const handler = (event: Event) => {
+      event.preventDefault()
+      if (!isIos) {
+        setPromptEvent(event as BeforeInstallPromptEvent)
+      }
+    }
+
+    window.addEventListener("beforeinstallprompt", handler)
 
     return () => window.removeEventListener("beforeinstallprompt", handler)
   }, [])
@@ -67,11 +76,26 @@ export function InstallPrompt() {
         <X className="h-4 w-4" />
       </button>
       <div className="pr-8">
-        <p className="text-sm font-semibold">Install Huddle</p>
+        <p className="text-sm font-semibold">{showIosHint ? "Add Huddle to Home Screen" : "Install Huddle"}</p>
         <p className="mt-1 text-xs text-white/64">
-          Use it like an app from your home screen. {showIosHint ? "On iPhone, tap Share then Add to Home Screen." : "It works offline after your first visit."}
+          {showIosHint
+            ? "iOS does not support the Android-style install button. Use Safari's Share menu instead."
+            : "Use it like an app from your home screen. It works offline after your first visit."}
         </p>
       </div>
+      {showIosHint && (
+        <div className="mt-3 rounded-2xl bg-white/8 p-3 text-xs leading-5 text-white/72">
+          <div className="flex items-center gap-2 font-semibold text-white">
+            <Share className="h-4 w-4 text-secondary" />
+            iPhone / iPad steps
+          </div>
+          <ol className="mt-2 list-inside list-decimal space-y-1">
+            <li>Open this site in Safari.</li>
+            <li>Tap the Share button.</li>
+            <li>Choose Add to Home Screen.</li>
+          </ol>
+        </div>
+      )}
       {promptEvent && (
         <button
           type="button"
