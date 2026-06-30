@@ -197,8 +197,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     [activities]
   )
   const chatActivities = useMemo(
-    () => approvedActivities.filter((activity) => activity.goingCount >= 2),
-    [approvedActivities]
+  () => approvedActivities.filter((activity) => 
+    activity.goingCount >= 2 && activity.userRsvp?.status === "going"
+  ),
+  [approvedActivities]
   )
   const pendingActivities = useMemo(
     () => state.activities.filter((activity) => activity.status === "pending"),

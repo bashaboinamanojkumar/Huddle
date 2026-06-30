@@ -43,7 +43,8 @@ export default function ChatThreadPage() {
   }
 
   const archived = isArchived(activity.startTime)
-  const chatOpen = activity.goingCount >= 2
+  const userRsvped = activity.userRsvp?.status === "going"
+  const chatOpen = activity.goingCount >= 2 && userRsvped
 
   const submit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
