@@ -117,13 +117,13 @@ export default function ActivityDetailPage() {
             {isGoing ? "Leave" : isWaitlisted ? "Leave waitlist" : isFull ? "Join waitlist" : "RSVP"}
           </button>
           <Link
-            href={chatOpen ? `/app/chats/${activity.id}` : "#attendees"}
+            href={chatOpen ? `/app/chats/${activity.id}` : isGoing ? "/app/chats" : "#attendees"}
             className={`flex items-center justify-center gap-2 rounded-2xl px-4 py-4 text-sm font-bold ${
-              chatOpen ? "bg-white text-black" : "bg-white/8 text-white/44"
+            chatOpen ? "bg-white text-black" : isGoing ? "bg-white/18 text-white/70" : "bg-white/8 text-white/44"
             }`}
           >
             <MessageCircle className="h-4 w-4" />
-               {chatOpen ? "Open chat" : isGoing ? "Chat at 2" : "RSVP to chat"}
+            {chatOpen ? "Open chat" : isGoing ? "Chat at 2" : "RSVP to chat"}
           </Link>
         </div>
 
