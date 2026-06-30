@@ -24,6 +24,7 @@ import type {
   SafetyPreference,
   StudentStatus,
   AvailabilityBlock,
+  RsvpStatus, 
 } from "@/lib/types/huddle"
 
 const STORAGE_KEY = "huddle.phase1.state.v1"
@@ -321,11 +322,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       const rsvps = previous
         ? prev.rsvps.map((item) =>
             item.activityId === activityId && item.userId === currentUserId
-              ? { ...item, status, timestamp }
-              : item
+            ? { ...item, status: status as RsvpStatus, timestamp }
+            : item
           )
-        : [...prev.rsvps, { activityId, userId: currentUserId, status, timestamp }]
-
+          : [...prev.rsvps, { activityId, userId: currentUserId, status: status as RsvpStatus, timestamp }]
       const nextGoingCount = rsvps.filter((item) => item.activityId === activityId && item.status === "going").length
       const hasOpener = prev.messages.some((item) => item.activityId === activityId && item.userId === "system")
       const messages =
