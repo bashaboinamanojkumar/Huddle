@@ -4,21 +4,23 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Bell, Search, ShieldAlert } from "lucide-react"
 import { ActivityCard } from "@/components/huddle/activity-card"
-import { availabilityMeta, categoryMeta } from "@/lib/data/seed"
+
 import { getAvailabilityMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
-import type { AvailabilityBlock, Category } from "@/lib/types/huddle"
+import { categoryMeta } from "@/lib/data/seed"
+import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
   const { approvedActivities, currentProfile } = useHuddle()
   const [category, setCategory] = useState<Category | "all">("all")
-  const [block, setBlock] = useState<AvailabilityBlock | "all">("all")
+  const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
 
   const filtered = useMemo(() => {
-    return approvedActivities.filter((activity) => {
+  return approvedActivities
+    .filter((activity) => {
       const matchesCategory = category === "all" || activity.category === category
-      const matchesBlock = block === "all" || activity.availabilityBlock === block
+      const matchesBlock = date === "all" || activity.startTime.startsWith(date)
       const query = search.trim().toLowerCase()
       const matchesSearch =
         !query ||
@@ -27,7 +29,16 @@ export default function ActivityFeedPage() {
         activity.location.name.toLowerCase().includes(query)
       return matchesCategory && matchesBlock && matchesSearch
     })
-  }, [approvedActivities, block, category, search])
+    .sort((a, b) => {
+      const aMatchesCategory = category === "all" || a.category === category
+      const bMatchesCategory = category === "all" || b.category === category
+      const aMatchesBlock = date === "all" || a.startTime.startsWith(date)
+      const bMatchesBlock = date === "all" || b.startTime.startsWith(date)
+      const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
+      const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
+      return bScore - aScore
+    })
+}, [approvedActivities, date, category, search])
 
   return (
     <div className="min-h-full bg-background">
@@ -104,23 +115,27 @@ export default function ActivityFeedPage() {
         <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
           <button
             type="button"
-            onClick={() => setBlock("all")}
+            onClick={() => setDate("all")}
             className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-              block === "all" ? "bg-white text-black" : "bg-white/8 text-white/62"
+              date === "all" ? "bg-white text-black" : "bg-white/8 text-white/62"
             }`}
           >
-            Any time
+            All dates
           </button>
-          {availabilityMeta.map((item) => (
+          {Array.from(
+            new Set(approvedActivities.map((a) => a.startTime.slice(0, 10)))
+          )
+          .sort()
+          .map((d) => (
             <button
-              key={item.id}
+              key={d}
               type="button"
-              onClick={() => setBlock(item.id)}
+              onClick={() => setDate(d)}
               className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-                block === item.id ? "bg-white text-black" : "bg-white/8 text-white/62"
+              date === d ? "bg-white text-black" : "bg-white/8 text-white/62"
               }`}
             >
-              {item.shortLabel}
+              {new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </button>
           ))}
         </div>
@@ -129,7 +144,7 @@ export default function ActivityFeedPage() {
           <div>
             <h2 className="font-heading text-xl font-black text-white">Best matches</h2>
             <p className="mt-1 text-xs text-white/46">
-              Sorted by interests, {block === "all" ? "availability" : getAvailabilityMeta(block).shortLabel}, and comfort.
+              Sorted by interests, availability, and comfort.
             </p>
           </div>
           <Link href="/crisis" className="flex h-11 w-11 items-center justify-center rounded-full bg-coral/18 text-coral" aria-label="Safety resources">
@@ -153,7 +168,7 @@ export default function ActivityFeedPage() {
               type="button"
               onClick={() => {
                 setCategory("all")
-                setBlock("all")
+                setDate("all")
                 setSearch("")
               }}
               className="mt-4 rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground"
