@@ -33,7 +33,7 @@ export type StudentStatus =
   | "other"
 
 export type ComfortSize = "small" | "medium" | "either"
-export type SafetyPreference = "none" | "mixed" | "women_only"
+export type SafetyPreference = "none" | "mixed" | "women_only" | "same_gender"
 export type ActivitySource = "seeded" | "org" | "user"
 export type ActivityStatus = "draft" | "pending" | "approved" | "rejected"
 export type RsvpStatus = "going" | "waitlisted" | "left"

@@ -9,10 +9,10 @@ import { useHuddle } from "@/lib/store/huddle-store"
 import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference, StudentStatus } from "@/lib/types/huddle"
 
 const statuses: { id: StudentStatus; label: string }[] = [
-  { id: "undergrad_1", label: "Undergrad year 1" },
-  { id: "undergrad_2", label: "Undergrad year 2" },
-  { id: "undergrad_3", label: "Undergrad year 3" },
-  { id: "undergrad_4", label: "Undergrad year 4" },
+  { id: "undergrad_1", label: "Freshman" },
+  { id: "undergrad_2", label: "Sophomore" },
+  { id: "undergrad_3", label: "Junior" },
+  { id: "undergrad_4", label: "Senior" },
   { id: "masters", label: "Master's" },
   { id: "phd", label: "PhD" },
   { id: "postdoc", label: "Postdoc" },
@@ -28,7 +28,8 @@ const comfortOptions: { id: ComfortSize; label: string; detail: string }[] = [
 const safetyOptions: { id: SafetyPreference; label: string; detail: string }[] = [
   { id: "none", label: "No preference", detail: "Use normal sorting" },
   { id: "mixed", label: "Prefer mixed groups", detail: "Boost mixed activities" },
-  { id: "women_only", label: "Women-only", detail: "Hard filter when offered" },
+  { id: "women_only", label: "Same-sex groups", detail: "Hard filter when offered" },
+  { id: "same_gender", label: "Same-gender", detail: "Inclusive of LGBTQ+ identities" },
 ]
 
 function SelectCard({

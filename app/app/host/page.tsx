@@ -230,7 +230,7 @@ export default function HostPage() {
             ))}
           </div>
           <div className="mt-3 grid grid-cols-3 gap-2">
-            {(["none", "mixed", "women_only"] as SafetyPreference[]).map((item) => (
+            {(["none", "mixed", "women_only", "same_gender"] as SafetyPreference[]).map((item) => (
               <button
                 key={item}
                 type="button"
@@ -239,7 +239,7 @@ export default function HostPage() {
                   safetyPreference === item ? "bg-white text-black" : "bg-white/8 text-white/60"
                 }`}
               >
-                {item === "women_only" ? "Women-only" : item}
+                {item === "women_only" ? "Same-sex groups" : item === "same_gender" ? "Same-gender" : item}
               </button>
             ))}
           </div>
