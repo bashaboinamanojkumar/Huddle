@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import Link from "next/link"
 import { CalendarClock, CheckCircle2, Flag, MapPin, ShieldAlert } from "lucide-react"
 import { toast } from "sonner"
@@ -18,7 +18,15 @@ export default function HostPage() {
   const [description, setDescription] = useState("")
   const [locationId, setLocationId] = useState(state.locations[0]?.id ?? "")
   const [startTime, setStartTime] = useState("")
-  const [availabilityBlock, setAvailabilityBlock] = useState<AvailabilityBlock>("weekday_evening")
+  const availabilityBlock = useMemo((): AvailabilityBlock => {
+        if (!startTime) return "weekday_evening"
+        const date = new Date(startTime)
+        const day = date.getDay()
+        const hour = date.getHours()
+        const isWeekend = day === 0 || day === 6
+        if (isWeekend) return hour < 12 ? "weekend_morning" : "weekend_afternoon"
+        return hour < 12 ? "weekday_morning" : hour < 17 ? "weekday_afternoon" : "weekday_evening"
+      }, [startTime])
   const [capacity, setCapacity] = useState(4)
   const [comfortSize, setComfortSize] = useState<ComfortSize>("medium")
   const [safetyPreference, setSafetyPreference] = useState<SafetyPreference>("none")
@@ -178,7 +186,7 @@ export default function HostPage() {
             />
           </div>
 
-          <h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-white/46">Availability block</h3>
+          {/*<h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-white/46">Availability block</h3>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
             {availabilityMeta.map((item) => (
               <button
@@ -192,7 +200,7 @@ export default function HostPage() {
                 {item.shortLabel}
               </button>
             ))}
-          </div>
+          </div>*/}
 
           <label className="mt-5 block text-xs font-semibold uppercase tracking-wide text-white/46" htmlFor="capacity">
             Capacity: {capacity}
