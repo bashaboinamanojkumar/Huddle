@@ -31,7 +31,7 @@ export default function ActivityDetailPage() {
   const isGoing = activity.userRsvp?.status === "going"
   const isWaitlisted = activity.userRsvp?.status === "waitlisted"
   const isFull = activity.seatsLeft === 0 && !isGoing
-  const chatOpen = activity.goingCount >= 2
+  const chatOpen = activity.goingCount >= 2 && isGoing
 
   const toggleRsvp = () => {
     if (isGoing || isWaitlisted) {
@@ -40,8 +40,18 @@ export default function ActivityDetailPage() {
       return
     }
     const status = rsvpActivity(activity.id)
-    if (status === "going") toast.success("You are going.")
+    if (status === "going") {
+      toast.success("You are going.")
+    }
     if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
+  }
+
+  const addToCalendar = () => {
+    const start = new Date(activity.startTime)
+    const end = new Date(start.getTime() + 60 * 60 * 1000) // 1 hour duration
+    const format = (d: Date) => d.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z"
+    const url = `https://www.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(activity.title)}&dates=${format(start)}/${format(end)}&details=${encodeURIComponent(activity.description)}&location=${encodeURIComponent(activity.location.name)}`
+    window.open(url, "_blank")
   }
 
   const report = () => {
@@ -113,9 +123,20 @@ export default function ActivityDetailPage() {
             }`}
           >
             <MessageCircle className="h-4 w-4" />
-            {chatOpen ? "Open chat" : "Chat at 2"}
+               {chatOpen ? "Open chat" : isGoing ? "Chat at 2" : "RSVP to chat"}
           </Link>
         </div>
+
+        {isGoing && (
+          <button
+            type="button"
+            onClick={addToCalendar}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-secondary/30 bg-secondary/12 px-4 py-4 text-sm font-bold text-secondary"
+          >
+            <Calendar className="h-4 w-4" />
+              Add to Google Calendar
+          </button>
+        )}
 
         <section className="mt-5 glass-card rounded-[2rem] p-5">
           <div className="flex items-center gap-3">
