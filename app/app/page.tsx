@@ -55,7 +55,7 @@ const filtered = useMemo(() => {
       const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
       return bScore - aScore
     })
-}, [approvedActivities, date, category, search])
+}, [allActivities, date, category, search])
 
   return (
     <div className="min-h-full bg-background">
@@ -140,7 +140,7 @@ const filtered = useMemo(() => {
             All dates
           </button>
           {Array.from(
-            new Set(approvedActivities.map((a) => a.startTime.slice(0, 10)))
+            new Set(allActivities.map((a) => a.startTime.slice(0, 10)))
           )
           .sort()
           .map((d) => (
