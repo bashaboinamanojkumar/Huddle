@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { Calendar, MapPin, UsersRound } from "lucide-react"
+import { Calendar, MapPin, Minus, TrendingUp, UsersRound, Zap } from "lucide-react"
 import { toast } from "sonner"
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { formatActivityDate, formatActivityTime, getCategoryMeta } from "@/lib/format"
@@ -50,8 +50,14 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
               ? "bg-secondary/20 text-secondary"
               : "bg-white/10 text-white/60"
           }`}>
-            {activity.fitScore >= 80 ? "😄" : activity.fitScore >= 50 ? "🙂" : "😐"}
-            {activity.fitScore}
+              {activity.fitScore >= 80 ? (
+                <Zap className="h-3 w-3" />
+                ) : activity.fitScore >= 50 ? (
+                <TrendingUp className="h-3 w-3" />
+                ) : (
+                <Minus className="h-3 w-3" />
+                )}
+              {activity.fitScore} fit
           </div>
         </div>
 
