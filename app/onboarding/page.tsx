@@ -83,10 +83,9 @@ export default function OnboardingPage() {
   const [gender, setGender] = useState<Gender | undefined>(currentProfile.gender)
 
   const canContinue = useMemo(() => {
-    if (step === 2) return interests.length >= 3 && interests.length <= 8
-    if (step === 3) return availability.length > 0
-    return true
-  }, [availability.length, interests.length, step])
+  if (step === 2) return interests.length >= 3 && interests.length <= 8
+  return true
+}, [interests.length, step])
 
   const toggleInterest = (category: Category) => {
     setInterests((prev) => {
@@ -182,8 +181,8 @@ export default function OnboardingPage() {
 
           {step === 3 && (
             <div>
-              <h2 className="font-heading text-xl font-bold text-white">When can you meet?</h2>
-              <p className="mt-1 text-sm text-white/54">Broad blocks only. No calendar grid needed.</p>
+              <h2 className="font-heading text-xl font-bold text-white">Preferred availability</h2>
+              <p className="mt-1 text-sm text-white/54">Select times you are typically free. You can skip this if you prefer.</p>
               <div className="mt-5 grid gap-3">
                 {availabilityMeta.map((block) => (
                   <SelectCard
@@ -270,7 +269,7 @@ export default function OnboardingPage() {
             disabled={!canContinue}
             className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground disabled:opacity-45"
           >
-            {step === 4 ? "Enter Huddle" : "Continue"}
+            {step === 5 ? "Enter Huddle" : "Continue"}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
