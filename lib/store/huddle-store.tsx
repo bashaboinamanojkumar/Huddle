@@ -16,6 +16,7 @@ import type {
   Category,
   ChatMessage,
   ComfortSize,
+  Gender,
   HuddleActivity,
   HuddleProfile,
   HuddleSession,
@@ -34,6 +35,7 @@ export interface OnboardingInput {
   firstName: string
   lastInitial: string
   status: StudentStatus
+  gender?: Gender
   interests: Category[]
   availabilityBlocks: AvailabilityBlock[]
   comfortSize: ComfortSize

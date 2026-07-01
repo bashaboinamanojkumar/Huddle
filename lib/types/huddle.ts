@@ -32,6 +32,7 @@ export type StudentStatus =
   | "postdoc"
   | "other"
 
+export type Gender = "male" | "female" | "transgender_woman" | "transgender_man" | "lesbian" | "gay" | "bisexual" | "non_binary" | "prefer_not_to_say"
 export type ComfortSize = "small" | "medium" | "either"
 export type SafetyPreference = "none" | "mixed" | "women_only" | "same_gender"
 export type ActivitySource = "seeded" | "org" | "user"
@@ -65,6 +66,7 @@ export interface HuddleProfile {
   firstName: string
   lastInitial: string
   status: StudentStatus
+  gender?: Gender
   interests: Category[]
   availabilityBlocks: AvailabilityBlock[]
   comfortSize: ComfortSize

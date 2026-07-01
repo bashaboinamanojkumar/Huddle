@@ -6,7 +6,7 @@ import { ArrowRight, Check, GraduationCap, ShieldCheck, Sparkles } from "lucide-
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { availabilityMeta, categoryMeta } from "@/lib/data/seed"
 import { useHuddle } from "@/lib/store/huddle-store"
-import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference, StudentStatus } from "@/lib/types/huddle"
+import type { AvailabilityBlock, Category, ComfortSize, Gender, SafetyPreference, StudentStatus } from "@/lib/types/huddle"
 
 const statuses: { id: StudentStatus; label: string }[] = [
   { id: "undergrad_1", label: "Freshman" },
@@ -30,6 +30,18 @@ const safetyOptions: { id: SafetyPreference; label: string; detail: string }[] =
   { id: "mixed", label: "Prefer mixed groups", detail: "Boost mixed activities" },
   { id: "women_only", label: "Same-sex groups", detail: "Hard filter when offered" },
   { id: "same_gender", label: "Same-gender", detail: "Inclusive of LGBTQ+ identities" },
+]
+
+const genderOptions: { id: Gender; label: string }[] = [
+  { id: "male", label: "Male" },
+  { id: "female", label: "Female" },
+  { id: "transgender_woman", label: "Transgender woman" },
+  { id: "transgender_man", label: "Transgender man" },
+  { id: "lesbian", label: "Lesbian" },
+  { id: "gay", label: "Gay" },
+  { id: "bisexual", label: "Bisexual" },
+  { id: "non_binary", label: "Non-binary" },
+  { id: "prefer_not_to_say", label: "Prefer not to say" },
 ]
 
 function SelectCard({
@@ -68,6 +80,7 @@ export default function OnboardingPage() {
   const [availability, setAvailability] = useState<AvailabilityBlock[]>(currentProfile.availabilityBlocks)
   const [comfortSize, setComfortSize] = useState<ComfortSize>(currentProfile.comfortSize)
   const [safetyPreference, setSafetyPreference] = useState<SafetyPreference>(currentProfile.safetyPreference)
+  const [gender, setGender] = useState<Gender | undefined>(currentProfile.gender)
 
   const canContinue = useMemo(() => {
     if (step === 2) return interests.length >= 3 && interests.length <= 8
@@ -94,6 +107,7 @@ export default function OnboardingPage() {
       firstName: currentProfile.firstName,
       lastInitial: currentProfile.lastInitial,
       status,
+      gender,
       interests,
       availabilityBlocks: availability,
       comfortSize,
@@ -116,7 +130,7 @@ export default function OnboardingPage() {
         </div>
 
         <div className="mt-5 flex gap-2">
-          {[1, 2, 3, 4].map((item) => (
+          {[1, 2, 3, 4, 5].map((item) => (
             <div key={item} className="h-1.5 flex-1 rounded-full bg-white/10">
               <div className={`h-full rounded-full bg-secondary transition-all ${item <= step ? "w-full" : "w-0"}`} />
             </div>
@@ -221,6 +235,24 @@ export default function OnboardingPage() {
               </div>
             </div>
           )}
+          
+          {step === 5 && (
+            <div>
+              <h2 className="font-heading text-xl font-bold text-white">Your gender identity</h2>
+              <p className="mt-1 text-sm text-white/54">Optional — helps us personalise your experience.</p>
+                <div className="mt-5 grid grid-cols-2 gap-3">
+                {genderOptions.map((item) => (
+                  <SelectCard
+                    key={item.id}
+                    active={gender === item.id}
+                    onClick={() => setGender(item.id)}
+                  >
+                  <span className="pr-6 text-sm font-semibold">{item.label}</span>
+                  </SelectCard>
+                ))}
+                </div>
+            </div>
+          )}
         </div>
 
         <div className="safe-pb mt-5 flex items-center gap-3">
@@ -234,7 +266,7 @@ export default function OnboardingPage() {
           </button>
           <button
             type="button"
-            onClick={() => (step === 4 ? finish() : setStep((prev) => prev + 1))}
+            onClick={() => (step === 5 ? finish() : setStep((prev) => prev + 1))}
             disabled={!canContinue}
             className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground disabled:opacity-45"
           >
