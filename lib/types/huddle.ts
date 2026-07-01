@@ -13,6 +13,7 @@ export type Category =
   | "language"
   | "volunteering"
   | "hangout"
+  | "sports"
 
 export type AvailabilityBlock =
   | "weekday_morning"

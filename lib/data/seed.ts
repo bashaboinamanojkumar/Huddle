@@ -31,6 +31,7 @@ export const categoryMeta: CategoryMeta[] = [
   { id: "language", label: "Language Exchange", shortLabel: "Language", icon: "Languages", color: "#82d7ff" },
   { id: "volunteering", label: "Volunteering", shortLabel: "Service", icon: "HeartHandshake", color: "#7dd9c5" },
   { id: "hangout", label: "Just hang out", shortLabel: "Hangout", icon: "Smile", color: "#d7deff" },
+  { id: "sports", label: "Sports", shortLabel: "Sports", icon: "Trophy", color: "#ffd580" },
 ]
 
 export const availabilityMeta: AvailabilityMeta[] = [

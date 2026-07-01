@@ -9,6 +9,7 @@ import {
   Smile,
   Sparkles,
   Trees,
+  Trophy,
 } from "lucide-react"
 import type { Category } from "@/lib/types/huddle"
 
@@ -23,6 +24,7 @@ const iconMap = {
   language: Languages,
   volunteering: HeartHandshake,
   hangout: Smile,
+  sports: Trophy,
 } satisfies Record<Category, typeof BookOpen>
 
 export function CategoryIcon({ category, className }: { category: Category; className?: string }) {
