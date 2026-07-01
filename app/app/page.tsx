@@ -1,5 +1,6 @@
 "use client"
 
+import { useTerplinkEvents } from "@/hooks/use-terplink-events"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Bell, Search, ShieldAlert } from "lucide-react"
@@ -11,13 +12,29 @@ import { categoryMeta } from "@/lib/data/seed"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile } = useHuddle()
+  const { approvedActivities, currentProfile, state } = useHuddle()
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
+  const { events: terplinkEvents } = useTerplinkEvents()
 
-  const filtered = useMemo(() => {
-  return approvedActivities
+  const allActivities = useMemo(() => {
+  const terplinkViews = terplinkEvents.map((event) => ({
+    ...event,
+    location: state.locations.find((l) => l.id === event.locationId) ?? state.locations[0],
+    host: state.profiles[0],
+    attendees: [],
+    goingCount: 0,
+    seatsLeft: event.capacity,
+    userRsvp: undefined,
+    fitScore: 50,
+    sharedInterests: [],
+  }))
+  return [...approvedActivities, ...terplinkViews]
+}, [approvedActivities, terplinkEvents, state.locations, state.profiles])
+
+const filtered = useMemo(() => {
+  return allActivities
     .filter((activity) => {
       const matchesCategory = category === "all" || activity.category === category
       const matchesBlock = date === "all" || activity.startTime.startsWith(date)
@@ -62,7 +79,7 @@ export default function ActivityFeedPage() {
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-3xl bg-black/18 p-3">
-            <p className="font-heading text-2xl font-black text-white">{approvedActivities.length}</p>
+            <p className="font-heading text-2xl font-black text-white">{allActivities.length}</p>
             <p className="text-[11px] text-white/62">joinable</p>
           </div>
           <div className="rounded-3xl bg-black/18 p-3">
