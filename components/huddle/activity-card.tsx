@@ -43,8 +43,15 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
               <h2 className="mt-1 font-heading text-lg font-bold leading-tight text-white">{activity.title}</h2>
             </div>
           </div>
-          <div className="rounded-full bg-white/10 px-2.5 py-1 text-xs font-semibold text-white">
-            {activity.fitScore} fit
+          <div className={`rounded-full px-2.5 py-1 text-xs font-semibold flex items-center gap-1 ${
+            activity.fitScore >= 80
+              ? "bg-mint/20 text-mint"
+              : activity.fitScore >= 50
+              ? "bg-secondary/20 text-secondary"
+              : "bg-white/10 text-white/60"
+          }`}>
+            {activity.fitScore >= 80 ? "😄" : activity.fitScore >= 50 ? "🙂" : "😐"}
+            {activity.fitScore}
           </div>
         </div>
 
