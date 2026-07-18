@@ -30,13 +30,14 @@ export default function HostPage() {
   const [capacity, setCapacity] = useState(4)
   const [comfortSize, setComfortSize] = useState<ComfortSize>("medium")
   const [safetyPreference, setSafetyPreference] = useState<SafetyPreference>("none")
-
+  const [customLocation, setCustomLocation] = useState("")
+const [useCustomLocation, setUseCustomLocation] = useState(false)
   const canSubmit =
     title.trim().length >= 3 &&
     title.trim().length <= 80 &&
     description.trim().length > 0 &&
     description.trim().length <= 500 &&
-    Boolean(locationId) &&
+    (Boolean(locationId) || (useCustomLocation && customLocation.trim().length > 0)) &&
     Boolean(startTime) &&
     capacity >= 2 &&
     capacity <= 8
@@ -50,7 +51,9 @@ export default function HostPage() {
 
     const activity = createActivity({
       title: title.trim(),
-      description: description.trim(),
+      description: useCustomLocation && customLocation.trim()
+      ? `${description.trim()}\n\nSuggested meet point: ${customLocation.trim()}`
+      : description.trim(),
       category,
       locationId,
       capacity,
@@ -167,6 +170,30 @@ export default function HostPage() {
                 </span>
               </button>
             ))}
+          </div>
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setUseCustomLocation((prev) => !prev)}
+              className={`w-full rounded-3xl border p-4 text-left text-sm font-bold ${
+                useCustomLocation ? "border-secondary bg-secondary/18 text-white" : "border-white/10 bg-white/6 text-white/72"
+              }`}
+            >
+              📍 Suggest a new location
+            </button>
+            {useCustomLocation && (
+              <input
+                value={customLocation}
+                onChange={(e) => setCustomLocation(e.target.value)}
+                placeholder="e.g. Riggs Alumni Center Lobby"
+                className="mt-3 min-h-12 w-full rounded-2xl border border-white/10 bg-white/8 px-4 text-sm text-white outline-none placeholder:text-white/34"
+              />
+            )}
+            {useCustomLocation && (
+              <p className="mt-2 text-xs text-white/46">
+                Suggested locations are reviewed before approval. Use public campus spaces only.
+              </p>
+            )}
           </div>
         </section>
 
