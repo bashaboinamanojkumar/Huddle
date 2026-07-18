@@ -11,7 +11,7 @@ import type {
   FriendConnection,
 } from "@/lib/types/huddle"
 
-const now = new Date("2026-06-25T16:00:00.000Z")
+const now = new Date()
 
 function futureDate(days: number, hours: number): string {
   const date = new Date(now)

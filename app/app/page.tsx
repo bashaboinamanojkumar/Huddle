@@ -19,7 +19,9 @@ export default function ActivityFeedPage() {
   const { events: terplinkEvents } = useTerplinkEvents()
 
   const allActivities = useMemo(() => {
-  const terplinkViews = terplinkEvents.map((event) => ({
+  const terplinkViews = terplinkEvents
+  .filter((event) => new Date(event.startTime) > new Date())
+  .map((event) => ({
     ...event,
     location: state.locations.find((l) => l.id === event.locationId) ?? state.locations[0],
     host: state.profiles[0],

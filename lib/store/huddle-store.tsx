@@ -196,8 +196,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
 
   const activities = useMemo(() => buildActivityViews(state, currentUserId), [state, currentUserId])
   const approvedActivities = useMemo(
-    () => activities.filter((activity) => activity.status === "approved"),
-    [activities]
+  () => activities.filter((activity) => 
+    activity.status === "approved" && new Date(activity.startTime) > new Date()
+  ),
+  [activities]
   )
   const chatActivities = useMemo(
   () => approvedActivities.filter((activity) => 

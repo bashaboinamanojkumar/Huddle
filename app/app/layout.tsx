@@ -6,10 +6,12 @@ import { PhoneFrame } from "@/components/layout/phone-frame"
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PhoneFrame>
-      <main className="min-h-0 flex-1 overflow-y-auto pb-3">
+      <main className="min-h-0 flex-1 overflow-y-auto pb-20">
         {children}
       </main>
-      <BottomNav />
+      <div className="shrink-0">
+        <BottomNav />
+      </div>
     </PhoneFrame>
   )
 }
