@@ -103,10 +103,14 @@ export default function ActivityDetailPage() {
               <Calendar className="h-5 w-5 text-secondary" />
               {formatActivityDate(activity.startTime)} at {formatActivityTime(activity.startTime)}
             </span>
-            <span className="flex items-center gap-3">
-              <MapPin className="h-5 w-5 text-secondary" />
-              {activity.location.name}, {activity.location.area}
-            </span>
+            <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(activity.location.name + " " + activity.location.area + " College Park MD")}`}
+               target="_blank"
+               rel="noopener noreferrer"
+               className="flex items-center gap-3 text-secondary underline-offset-2 hover:underline"
+              >
+                <MapPin className="h-5 w-5 text-secondary" />
+                  {activity.location.name}, {activity.location.area}
+            </a>
             <span className="flex items-center gap-3">
               <UsersRound className="h-5 w-5 text-secondary" />
               {activity.goingCount}/{activity.capacity} going, {activity.seatsLeft} seats left

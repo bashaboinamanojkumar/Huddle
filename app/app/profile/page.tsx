@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, Award, RotateCcw, ShieldCheck, Siren, UserRound } from "lucide-react"
+import { AlertTriangle, Award, MessageSquarePlus, RotateCcw, ShieldCheck, Siren, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { crisisResources } from "@/lib/config/crisis"
 import { getCategoryMeta } from "@/lib/format"
@@ -88,6 +88,25 @@ export default function ProfilePage() {
             </div>
           ))}
         </div>
+      </section>
+
+      <section className="mt-5 glass-card rounded-[2rem] p-5">
+        <div className="flex items-center gap-3">
+          <MessageSquarePlus className="h-5 w-5 text-secondary" />
+          <h2 className="font-heading text-lg font-bold text-white">Share feedback</h2>
+        </div>
+        <p className="mt-2 text-sm leading-6 text-white/62">
+          Help us improve Huddle — tell us what's working and what's not.
+        </p>
+        <a href="FEEDBACK_FORM_URL_HERE"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-4 text-sm font-black text-secondary-foreground"
+        >
+          <MessageSquarePlus className="h-4 w-4" />
+            Give feedback
+        </a>
+
       </section>
 
       <section className="mt-5 rounded-[2rem] border border-coral/25 bg-coral/12 p-5">
