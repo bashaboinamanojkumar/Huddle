@@ -35,7 +35,7 @@ export default function HostPage() {
     title.trim().length >= 3 &&
     title.trim().length <= 80 &&
     description.trim().length > 0 &&
-    description.trim().length <= 240 &&
+    description.trim().length <= 500 &&
     Boolean(locationId) &&
     Boolean(startTime) &&
     capacity >= 2 &&
@@ -137,12 +137,12 @@ export default function HostPage() {
             className="mt-2 min-h-12 w-full rounded-2xl border border-white/10 bg-white/8 px-4 text-sm text-white outline-none placeholder:text-white/34"
           />
           <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-white/46" htmlFor="description">
-            Short description ({description.length}/240)
+            Short description ({description.length}/500)
           </label>
           <textarea
             id="description"
             value={description}
-            onChange={(event) => setDescription(event.target.value.slice(0, 240))}
+            onChange={(event) => setDescription(event.target.value.slice(0, 500))}
             placeholder="A relaxed public meetup for students who want to meet a few new people."
             className="mt-2 min-h-28 w-full resize-none rounded-2xl border border-white/10 bg-white/8 p-4 text-sm text-white outline-none placeholder:text-white/34"
           />

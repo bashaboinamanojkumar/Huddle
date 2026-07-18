@@ -86,6 +86,49 @@ export const locations: HuddleLocation[] = [
     area: "Arts District",
     safetyNote: "Public outdoor seating near academic buildings.",
   },
+  {
+    id: "loc-eppley-gym",
+    universityId: "umd",
+    name: "Eppley Recreation Center Gym",
+    area: "North Campus",
+    safetyNote: "Public gym facility with staff on site.",
+  },
+  {
+    id: "loc-eppley-pickleball",
+    universityId: "umd",
+    name: "Eppley Pickleball Courts",
+    area: "North Campus",
+    safetyNote: "Outdoor public courts next to Eppley Rec Center.",
+  },
+  {
+    id: "loc-eppley-tennis",
+    universityId: "umd",
+    name: "Eppley Tennis Courts",
+    area: "North Campus",
+    safetyNote: "Public tennis courts next to Eppley Rec Center.",
+  },
+  {
+    id: "loc-eppley-pool",
+    universityId: "umd",
+    name: "Eppley Aquatic Center",
+    area: "North Campus",
+    safetyNote: "Public pool facility with lifeguards on duty.",
+  },
+  {
+    id: "loc-golf-course",
+    universityId: "umd",
+    name: "UMD Golf Course",
+    area: "South Campus",
+    safetyNote: "Public golf course on campus grounds.",
+  },
+  {
+    id: "loc-paint-branch",
+    universityId: "umd",
+    name: "Paint Branch Trail",
+    area: "East Campus",
+    safetyNote: "Public outdoor trail — stay on marked paths.",
+  },
+
 ]
 
 export const seedUsers: HuddleUser[] = [
