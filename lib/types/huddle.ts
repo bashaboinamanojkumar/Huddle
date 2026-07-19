@@ -1,6 +1,6 @@
 export type CampusDomain = "umd.edu" | "umaryland.edu"
 
-export type UniversityId = "umd"
+export type UniversityId = "umd" | "umb"
 
 export type Category =
   | "study"
@@ -46,6 +46,7 @@ export interface HuddleSession {
   userId: string
   email: string
   expiresAt: string
+  universityId: UniversityId
 }
 
 export interface WaitlistEntry {

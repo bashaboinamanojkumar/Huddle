@@ -12,7 +12,8 @@ import { categoryMeta } from "@/lib/data/seed"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile, state } = useHuddle()
+  const { approvedActivities, currentProfile, state, currentUserId } = useHuddle()
+  const userUniversityId = state.session?.universityId ?? "umd"
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
@@ -20,7 +21,7 @@ export default function ActivityFeedPage() {
 
   const allActivities = useMemo(() => {
   const terplinkViews = terplinkEvents
-  .filter((event) => new Date(event.startTime) > new Date())
+  .filter((event) => new Date(event.startTime) > new Date() && event.universityId === userUniversityId)
   .map((event) => ({
     ...event,
     location: state.locations.find((l) => l.id === event.locationId) ?? state.locations[0],
@@ -33,7 +34,7 @@ export default function ActivityFeedPage() {
     sharedInterests: [],
   }))
   return [...approvedActivities, ...terplinkViews]
-}, [approvedActivities, terplinkEvents, state.locations, state.profiles])
+  }, [approvedActivities, terplinkEvents, state.locations, state.profiles, userUniversityId])
 
 const filtered = useMemo(() => {
   return allActivities
@@ -64,7 +65,9 @@ const filtered = useMemo(() => {
       <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">Huddle UMD</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
+                {userUniversityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
+            </p>
             <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
               Good to see you, {currentProfile.firstName}.
             </h1>

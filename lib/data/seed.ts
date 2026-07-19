@@ -363,6 +363,7 @@ export const seedState: HuddleState = {
     userId: "user-you",
     email: "student@umd.edu",
     expiresAt: futureDate(30, 12),
+    universityId: "umd",
   },
   users: seedUsers,
   profiles: seedProfiles,

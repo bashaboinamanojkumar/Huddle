@@ -25,7 +25,7 @@ import type {
   SafetyPreference,
   StudentStatus,
   AvailabilityBlock,
-  RsvpStatus, 
+  UniversityId,
 } from "@/lib/types/huddle"
 
 const STORAGE_KEY = "huddle.phase1.state.v1"
@@ -216,10 +216,12 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     const normalized = email.trim().toLowerCase()
     const existing = state.users.find((user) => user.email === normalized)
     const userId = existing?.id ?? createId("user")
+    const universityId: UniversityId = normalized.includes("umaryland.edu") ? "umd" : "umd"
     const session: HuddleSession = {
       userId,
       email: normalized,
       expiresAt: addDays(SESSION_DAYS),
+      universityId,
     }
 
     setState((prev) => {

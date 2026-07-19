@@ -18,6 +18,25 @@ function futureDate(days: number, hours: number): string {
 export async function GET() {
   const events = [
     {
+      id: "umb-wellness-001",
+      title: "UMB Student Wellness Walk",
+      description: "A casual morning walk for UMB students to connect, unwind, and get some fresh air between classes.",
+      category: "outdoors",
+      locationId: "loc-eppley",
+      hostId: "system",
+      capacity: 15,
+      startTime: "2026-07-22T13:00:00.000Z",
+      availabilityBlock: "weekday_morning",
+      source: "org",
+      status: "approved",
+      universityId: "umb",
+      cohort: "umb-pilot",
+      comfortSize: "either",
+      safetyPreference: "none",
+      createdAt: new Date().toISOString(),
+      terpLinkUrl: "https://terplink.umd.edu",
+    },
+    {
       id: "terplink-12478027",
       title: "Figure Drawing Workshop",
       description: "Join Studio A for a live, clothed model figure drawing session with multiple timed sessions. All supplies provided — no experience needed.",
