@@ -3,6 +3,8 @@
 import { BottomNav } from "@/components/app/bottom-nav"
 import { PhoneFrame } from "@/components/layout/phone-frame"
 
+import { IosInstallBanner } from "@/components/app/ios-install-banner"
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PhoneFrame>
@@ -12,6 +14,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="shrink-0">
         <BottomNav />
       </div>
+      <IosInstallBanner />
     </PhoneFrame>
   )
 }
