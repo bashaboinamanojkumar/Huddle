@@ -12,8 +12,8 @@ const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700
 const lora = Lora({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-lora' })
 
 export const metadata: Metadata = {
-  title: 'Huddle UMD - Small Groups, Real Plans',
-  description: 'Huddle helps UMD students find small public activities, RSVP, and coordinate safely from an installable phone-first web app.',
+  title: 'Huddle - Small Groups, Real Plans',
+  description: 'Huddle connects University of Maryland students for real conversations, peer support, and mental wellness. Built by students, for students.',
   applicationName: 'Huddle',
   manifest: '/manifest.webmanifest',
   appleWebApp: {
