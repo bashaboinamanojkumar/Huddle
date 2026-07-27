@@ -12,11 +12,11 @@ import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
   const { approvedActivities, currentProfile, state } = useHuddle()
-  const userUniversityId = state.session?.universityId ?? "umd"
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
   const { events: terplinkEvents } = useTerplinkEvents()
+  const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
 
   const allActivities = useMemo(() => {
   const terplinkViews = terplinkEvents
