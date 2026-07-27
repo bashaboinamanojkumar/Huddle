@@ -33,7 +33,7 @@ export default function LandingPage() {
           {[
             { label: "RSVP", value: "1 tap" },
             { label: "Group", value: "2-8" },
-            { label: "Campus", value: "UMD" },
+            { label: "Campus", value: "UMD & UMB" },
           ].map((item) => (
             <div key={item.label} className="glass-card rounded-3xl p-4 text-center">
               <p className="font-heading text-xl font-bold text-white">{item.value}</p>

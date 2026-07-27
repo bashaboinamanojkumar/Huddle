@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { AlertTriangle, Award, MessageSquarePlus, RotateCcw, ShieldCheck, Siren, UserRound } from "lucide-react"
+import { AlertTriangle, Award, MessageSquarePlus, ShieldCheck, Siren, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { crisisResources } from "@/lib/config/crisis"
 import { getCategoryMeta } from "@/lib/format"
@@ -186,17 +186,7 @@ export default function ProfilePage() {
           <Link href="/app/admin/review" className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold text-white">
             Safety review queue
           </Link>
-          <button
-            type="button"
-            onClick={() => {
-              resetDemo()
-              toast("Demo data reset.")
-            }}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold text-white"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Reset demo data
-          </button>
+          
           <button
             type="button"
             onClick={() => void signOut()}
