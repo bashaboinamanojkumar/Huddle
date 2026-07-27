@@ -1,13 +1,5 @@
 import { NextResponse } from "next/server"
 
-function futureDate(days: number, hours: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  date.setHours(hours, 0, 0, 0)
-  return date.toISOString()
-}
-
-
 // ============================================
 // UPDATE THESE EVENTS EVERY 1-2 WEEKS
 // Go to terplink.umd.edu/events and pick

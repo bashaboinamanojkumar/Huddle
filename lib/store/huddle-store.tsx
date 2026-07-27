@@ -11,6 +11,10 @@ import {
 import { seedState } from "@/lib/data/seed"
 import { scoreFit } from "@/lib/scoring/score-fit"
 import { flagMessage } from "@/lib/safety/keywords"
+import {
+  bridgeAuthenticatedIdentity,
+  type AuthenticatedIdentity,
+} from "@/lib/store/profile-bridge"
 import type {
   ActivityView,
   Category,
@@ -19,17 +23,39 @@ import type {
   Gender,
   HuddleActivity,
   HuddleProfile,
-  HuddleSession,
   HuddleState,
+  RsvpStatus,
   SafetyFlag,
   SafetyPreference,
   StudentStatus,
   AvailabilityBlock,
-  UniversityId,
 } from "@/lib/types/huddle"
 
 const STORAGE_KEY = "huddle.phase1.state.v1"
-const SESSION_DAYS = 30
+
+const ANONYMOUS_USER_ID = "anonymous"
+
+/**
+ * Screens type `currentProfile` as always present, so an unassociated viewer needs a
+ * placeholder. It must never be a seeded student, otherwise a viewer without a verified
+ * local association would be shown someone else's name, points, and activity.
+ */
+const ANONYMOUS_PROFILE: HuddleProfile = {
+  userId: ANONYMOUS_USER_ID,
+  displayName: "Guest",
+  firstName: "Guest",
+  lastInitial: "",
+  status: "other",
+  interests: [],
+  availabilityBlocks: [],
+  comfortSize: "either",
+  safetyPreference: "none",
+  photoColor: "#3a3f4b",
+  points: 0,
+  streakDays: 0,
+  meetupsThisWeek: 0,
+  completedOnboarding: false,
+}
 
 export interface OnboardingInput {
   firstName: string
@@ -56,15 +82,18 @@ export interface CreateActivityInput {
 
 interface HuddleContextValue {
   state: HuddleState
+  hydrated: boolean
   currentUserId: string
   currentProfile: HuddleProfile
   activities: ActivityView[]
   approvedActivities: ActivityView[]
   chatActivities: ActivityView[]
   pendingActivities: HuddleActivity[]
-  signInWithEmail: (email: string) => HuddleSession
-  signOut: () => void
-  addToWaitlist: (email: string) => void
+  bridgeAuthenticatedUser: (
+    identity: AuthenticatedIdentity,
+    requestedPath?: string | null
+  ) => string
+  clearLocalSession: () => void
   completeOnboarding: (input: OnboardingInput) => void
   updateProfile: (updates: Partial<HuddleProfile>) => void
   rsvpActivity: (activityId: string) => "going" | "waitlisted" | "full"
@@ -80,28 +109,12 @@ interface HuddleContextValue {
 
 const HuddleContext = createContext<HuddleContextValue | undefined>(undefined)
 
-export function isCampusEmail(email: string): boolean {
-  const normalized = email.trim().toLowerCase()
-  return (
-    normalized.endsWith("@umd.edu") ||
-    normalized.endsWith(".umd.edu") ||
-    normalized.endsWith("@umaryland.edu") ||
-    normalized.endsWith(".umaryland.edu")
-  )
-}
-
 function createId(prefix: string): string {
   const random =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID()
       : Math.random().toString(36).slice(2)
   return `${prefix}-${random}`
-}
-
-function addDays(days: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() + days)
-  return date.toISOString()
 }
 
 function hydrateState(): HuddleState {
@@ -126,20 +139,8 @@ function hydrateState(): HuddleState {
   }
 }
 
-function initialsFromEmail(email: string): { firstName: string; lastInitial: string; displayName: string } {
-  const local = email.split("@")[0] || "student"
-  const parts = local.split(/[._-]/).filter(Boolean)
-  const first = parts[0] ? parts[0][0].toUpperCase() + parts[0].slice(1) : "Student"
-  const lastInitial = parts[1]?.[0]?.toUpperCase() || "T"
-  return {
-    firstName: first,
-    lastInitial,
-    displayName: `${first} ${lastInitial}.`,
-  }
-}
-
 function buildActivityViews(state: HuddleState, currentUserId: string): ActivityView[] {
-  const profile = state.profiles.find((item) => item.userId === currentUserId) ?? seedState.profiles[0]
+  const profile = state.profiles.find((item) => item.userId === currentUserId) ?? ANONYMOUS_PROFILE
 
   return state.activities
     .map((activity) => {
@@ -179,20 +180,22 @@ function buildActivityViews(state: HuddleState, currentUserId: string): Activity
 
 export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<HuddleState>(seedState)
+  const [hydrated, setHydrated] = useState(false)
 
   useEffect(() => {
     setState(hydrateState())
+    setHydrated(true)
   }, [])
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (hydrated && typeof window !== "undefined") {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
     }
-  }, [state])
+  }, [hydrated, state])
 
-  const currentUserId = state.session?.userId ?? "user-you"
+  const currentUserId = state.session?.userId ?? ANONYMOUS_USER_ID
   const currentProfile =
-    state.profiles.find((profile) => profile.userId === currentUserId) ?? seedState.profiles[0]
+    state.profiles.find((profile) => profile.userId === currentUserId) ?? ANONYMOUS_PROFILE
 
   const activities = useMemo(() => buildActivityViews(state, currentUserId), [state, currentUserId])
   const approvedActivities = useMemo(
@@ -212,77 +215,17 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     [state.activities]
   )
 
-  const signInWithEmail = useCallback((email: string) => {
-    const normalized = email.trim().toLowerCase()
-    const existing = state.users.find((user) => user.email === normalized)
-    const userId = existing?.id ?? createId("user")
-    const universityId: UniversityId = normalized.includes("umaryland.edu") ? "umd" : "umd"
-    const session: HuddleSession = {
-      userId,
-      email: normalized,
-      expiresAt: addDays(SESSION_DAYS),
-      universityId,
-    }
+  const bridgeAuthenticatedUser = useCallback((
+    identity: AuthenticatedIdentity,
+    requestedPath?: string | null
+  ) => {
+    const result = bridgeAuthenticatedIdentity(state, identity, requestedPath)
+    setState(result.state)
+    return result.destination
+  }, [state])
 
-    setState((prev) => {
-      if (existing) {
-        return { ...prev, session }
-      }
-
-      const name = initialsFromEmail(normalized)
-      return {
-        ...prev,
-        session,
-        users: [
-          ...prev.users,
-          {
-            id: userId,
-            email: normalized,
-            universityId: "umd",
-            cohort: "umd-pilot",
-            createdAt: new Date().toISOString(),
-          },
-        ],
-        profiles: [
-          ...prev.profiles,
-          {
-            userId,
-            displayName: name.displayName,
-            firstName: name.firstName,
-            lastInitial: name.lastInitial,
-            status: "other",
-            interests: [],
-            availabilityBlocks: [],
-            comfortSize: "either",
-            safetyPreference: "none",
-            photoColor: "#d05b47",
-            points: 0,
-            streakDays: 0,
-            meetupsThisWeek: 0,
-            completedOnboarding: false,
-          },
-        ],
-      }
-    })
-
-    return session
-  }, [state.users])
-
-  const signOut = useCallback(() => {
+  const clearLocalSession = useCallback(() => {
     setState((prev) => ({ ...prev, session: null }))
-  }, [])
-
-  const addToWaitlist = useCallback((email: string) => {
-    const normalized = email.trim().toLowerCase()
-    setState((prev) => {
-      if (prev.waitlist.some((entry) => entry.email === normalized)) {
-        return prev
-      }
-      return {
-        ...prev,
-        waitlist: [...prev.waitlist, { email: normalized, createdAt: new Date().toISOString() }],
-      }
-    })
   }, [])
 
   const completeOnboarding = useCallback((input: OnboardingInput) => {
@@ -518,15 +461,15 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<HuddleContextValue>(
     () => ({
       state,
+      hydrated,
       currentUserId,
       currentProfile,
       activities,
       approvedActivities,
       chatActivities,
       pendingActivities,
-      signInWithEmail,
-      signOut,
-      addToWaitlist,
+      bridgeAuthenticatedUser,
+      clearLocalSession,
       completeOnboarding,
       updateProfile,
       rsvpActivity,
@@ -541,15 +484,15 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     }),
     [
       state,
+      hydrated,
       currentUserId,
       currentProfile,
       activities,
       approvedActivities,
       chatActivities,
       pendingActivities,
-      signInWithEmail,
-      signOut,
-      addToWaitlist,
+      bridgeAuthenticatedUser,
+      clearLocalSession,
       completeOnboarding,
       updateProfile,
       rsvpActivity,

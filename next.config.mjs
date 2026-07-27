@@ -1,20 +1,13 @@
-import withPWA from 'next-pwa';
-
-const withPWAConfig = withPWA({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development',
-});
-
+/**
+ * The service worker at `public/sw.js` is hand written so it never caches protected
+ * routes, and `components/pwa/register-sw.tsx` registers it. A generator plugin here
+ * would overwrite that file with one that caches navigations.
+ */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     unoptimized: true,
   },
   turbopack: {},
 };
 
-export default withPWAConfig(nextConfig);
+export default nextConfig;

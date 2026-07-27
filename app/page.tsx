@@ -23,7 +23,7 @@ export default function LandingPage() {
               href="/verify"
               className="mt-8 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-white px-5 py-4 text-sm font-bold text-black"
             >
-              Start with campus email
+              Continue with campus Google
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

@@ -2,20 +2,58 @@
 
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { useState } from "react"
 import { AlertTriangle, Award, MessageSquarePlus, RotateCcw, ShieldCheck, Siren, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { crisisResources } from "@/lib/config/crisis"
 import { getCategoryMeta } from "@/lib/format"
+import { signOutEverywhere } from "@/lib/auth/sign-out"
 import { useHuddle } from "@/lib/store/huddle-store"
+import { createClient } from "@/lib/supabase/client"
 
 export default function ProfilePage() {
   const router = useRouter()
-  const { currentProfile, state, reportSafetyConcern, resetDemo, signOut } = useHuddle()
-  const email = state.session?.email ?? "student@umd.edu"
+  const {
+    currentProfile,
+    state,
+    reportSafetyConcern,
+    resetDemo,
+    clearLocalSession,
+  } = useHuddle()
+  const [isSigningOut, setIsSigningOut] = useState(false)
+  const email = state.session?.email
 
   const report = () => {
     reportSafetyConcern("General safety concern from profile screen")
     toast.success("Safety concern sent to the review queue.")
+  }
+
+  const signOut = async () => {
+    setIsSigningOut(true)
+    const result = await signOutEverywhere({
+      signOutSupabase: async () => {
+        const supabase = createClient()
+        const { error } = await supabase.auth.signOut()
+        return { error }
+      },
+      clearLocalSession,
+      purgeProtectedCache: () => {
+        if ("serviceWorker" in navigator) {
+          navigator.serviceWorker.controller?.postMessage({
+            type: "PURGE_PROTECTED_CACHES",
+          })
+        }
+      },
+    })
+
+    if (result.error) {
+      toast.error("Could not sign out securely. Please try again.")
+      setIsSigningOut(false)
+      return
+    }
+
+    router.replace("/")
+    router.refresh()
   }
 
   return (
@@ -31,7 +69,7 @@ export default function ProfilePage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary">Profile</p>
             <h1 className="mt-1 font-heading text-2xl font-black text-white">{currentProfile.displayName}</h1>
-            <p className="mt-1 text-sm text-white/50">{email}</p>
+            {email && <p className="mt-1 text-sm text-white/50">{email}</p>}
           </div>
         </div>
         <div className="mt-5 grid grid-cols-3 gap-3">
@@ -161,13 +199,12 @@ export default function ProfilePage() {
           </button>
           <button
             type="button"
-            onClick={() => {
-              signOut()
-              router.push("/")
-            }}
-            className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-black"
+            onClick={() => void signOut()}
+            disabled={isSigningOut}
+            aria-busy={isSigningOut}
+            className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-black disabled:cursor-wait disabled:opacity-60"
           >
-            Sign out
+            {isSigningOut ? "Signing out…" : "Sign out"}
           </button>
         </div>
       </section>

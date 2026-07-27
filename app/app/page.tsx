@@ -6,13 +6,12 @@ import Link from "next/link"
 import { Bell, Search, ShieldAlert } from "lucide-react"
 import { ActivityCard } from "@/components/huddle/activity-card"
 
-import { getAvailabilityMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
 import { categoryMeta } from "@/lib/data/seed"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile, state, currentUserId } = useHuddle()
+  const { approvedActivities, currentProfile, state } = useHuddle()
   const userUniversityId = state.session?.universityId ?? "umd"
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")

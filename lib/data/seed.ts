@@ -359,12 +359,7 @@ export const seedFriends: FriendConnection[] = [
 ]
 
 export const seedState: HuddleState = {
-  session: {
-    userId: "user-you",
-    email: "student@umd.edu",
-    expiresAt: futureDate(30, 12),
-    universityId: "umd",
-  },
+  session: null,
   users: seedUsers,
   profiles: seedProfiles,
   locations,

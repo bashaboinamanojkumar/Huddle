@@ -130,6 +130,7 @@ The browser will receive stable error codes rather than raw provider or token de
 - `missing_email`: Google did not return a usable verified email.
 - `campus_account_required`: the account is not an exact `umd.edu` or `umaryland.edu` account.
 - `session_expired`: a previously authenticated session is no longer valid.
+- `sign_in_required`: a protected route was requested with no session cookie at all. Distinguished from `session_expired` so a first-time visitor is prompted rather than told a session lapsed, and rendered as a neutral notice instead of an error.
 
 Logs may record the error category but must not print access tokens, refresh tokens, authorization codes, or full user profiles.
 

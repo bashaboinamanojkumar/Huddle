@@ -6,12 +6,19 @@ __v0_jsx-dev-runtime.ts
 # Common ignores
 node_modules/
 .next/
-.env*.local
 .DS_Store
-.env*
-.env
 .cursor/
 Huddle_Build_Detailed.md.docx
 _docx_extracted.xml
 _plan.txt
 /supabase/
+.pnpm-store/
+tsconfig.tsbuildinfo
+
+# Vercel CLI
+.vercel
+
+# Environment files: ignore every variant, keep the checked-in template.
+# The negation must stay after the wildcard or it has no effect.
+.env*
+!.env.example
