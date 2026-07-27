@@ -1,7 +1,5 @@
 # Google-Only Campus Login Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
 **Goal:** Replace Hurdle's simulated magic-link boundary with Supabase Google PKCE login restricted to verified exact-domain `umd.edu` and `umaryland.edu` accounts.
 
 **Architecture:** Pure modules in `lib/auth` own policy, callback orchestration, routing decisions, OAuth options, and sign-out ordering so security-sensitive behavior is directly unit tested. Next.js `proxy.ts` and server route/layout adapters connect those pure decisions to Supabase, while an idempotent pure store bridge associates the validated Supabase identity with the existing local demo data.
