@@ -1,4 +1,4 @@
-import { availabilityMeta, categoryMeta } from "@/lib/data/seed"
+import { availabilityMeta, categoryMeta } from "@/lib/data/metadata"
 import type { AvailabilityBlock, Category } from "@/lib/types/huddle"
 
 export function getCategoryMeta(category: Category) {

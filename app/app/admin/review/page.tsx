@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Check, Clock, Flag, ShieldCheck, X } from "lucide-react"
 import { toast } from "sonner"
@@ -16,7 +17,40 @@ const flagActions: { status: SafetyFlag["status"]; label: string }[] = [
 
 export default function ReviewQueuePage() {
   const { pendingActivities, state, resolveFlag, reviewActivity } = useHuddle()
+  const [busy, setBusy] = useState(false)
   const openFlags = state.flags.filter((flag) => flag.status === "open")
+
+  const review = async (activityId: string, status: "approved" | "rejected") => {
+    if (busy) return
+    setBusy(true)
+
+    try {
+      await reviewActivity(activityId, status)
+      if (status === "approved") {
+        toast.success("Activity approved.")
+      } else {
+        toast("Activity rejected and hidden.")
+      }
+    } catch {
+      toast.error("Could not record that decision. Please try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const resolve = async (flagId: string, status: SafetyFlag["status"]) => {
+    if (busy) return
+    setBusy(true)
+
+    try {
+      await resolveFlag(flagId, status)
+      toast(`Flag marked ${status}.`)
+    } catch {
+      toast.error("Could not record that decision. Please try again.")
+    } finally {
+      setBusy(false)
+    }
+  }
 
   return (
     <div className="min-h-full bg-background px-5 py-5">
@@ -44,22 +78,18 @@ export default function ReviewQueuePage() {
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    reviewActivity(activity.id, "approved")
-                    toast.success("Activity approved.")
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-mint/18 px-4 py-3 text-sm font-bold text-mint"
+                  onClick={() => void review(activity.id, "approved")}
+                  disabled={busy}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-mint/18 px-4 py-3 text-sm font-bold text-mint disabled:opacity-50"
                 >
                   <Check className="h-4 w-4" />
                   Approve
                 </button>
                 <button
                   type="button"
-                  onClick={() => {
-                    reviewActivity(activity.id, "rejected")
-                    toast("Activity rejected and hidden.")
-                  }}
-                  className="flex items-center justify-center gap-2 rounded-2xl bg-coral/18 px-4 py-3 text-sm font-bold text-coral"
+                  onClick={() => void review(activity.id, "rejected")}
+                  disabled={busy}
+                  className="flex items-center justify-center gap-2 rounded-2xl bg-coral/18 px-4 py-3 text-sm font-bold text-coral disabled:opacity-50"
                 >
                   <X className="h-4 w-4" />
                   Reject
@@ -91,11 +121,9 @@ export default function ReviewQueuePage() {
                   <button
                     key={action.status}
                     type="button"
-                    onClick={() => {
-                      resolveFlag(flag.id, action.status)
-                      toast(`Flag marked ${action.status}.`)
-                    }}
-                    className="rounded-2xl bg-white/8 px-3 py-3 text-xs font-bold text-white/70"
+                    onClick={() => void resolve(flag.id, action.status)}
+                    disabled={busy}
+                    className="rounded-2xl bg-white/8 px-3 py-3 text-xs font-bold text-white/70 disabled:opacity-50"
                   >
                     {action.label}
                   </button>

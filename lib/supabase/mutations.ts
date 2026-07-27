@@ -1,0 +1,273 @@
+import type { HuddleBrowserClient } from "@/lib/supabase/client"
+import {
+  toChatMessage,
+  toFriendConnection,
+  toHuddleActivity,
+  toSafetyReport,
+} from "@/lib/supabase/mappers"
+import { throwOnError } from "@/lib/supabase/queries"
+import type { TablesUpdate } from "@/lib/types/database"
+import type {
+  ActivityStatus,
+  ChatMessage,
+  FlagStatus,
+  FriendConnection,
+  HuddleActivity,
+  HuddleProfile,
+  RsvpStatus,
+  SafetyReport,
+  UniversityId,
+} from "@/lib/types/huddle"
+
+export interface OnboardingPayload {
+  firstName: string
+  lastInitial: string
+  status: HuddleProfile["status"]
+  gender?: HuddleProfile["gender"]
+  interests: HuddleProfile["interests"]
+  availabilityBlocks: HuddleProfile["availabilityBlocks"]
+  comfortSize: HuddleProfile["comfortSize"]
+  safetyPreference: HuddleProfile["safetyPreference"]
+}
+
+export interface CreateActivityPayload {
+  title: string
+  description: string
+  category: HuddleActivity["category"]
+  locationId: string
+  capacity: number
+  startTime: string
+  availabilityBlock: HuddleActivity["availabilityBlock"]
+  comfortSize: HuddleActivity["comfortSize"]
+  safetyPreference: HuddleActivity["safetyPreference"]
+}
+
+/**
+ * Only the columns the authenticated role may write are mapped. Points, streaks and
+ * meetup counts are intentionally absent because the database refuses them.
+ */
+function toProfileUpdate(updates: Partial<HuddleProfile>): TablesUpdate<"profiles"> {
+  const patch: TablesUpdate<"profiles"> = {}
+
+  if (updates.firstName !== undefined) patch.first_name = updates.firstName
+  if (updates.lastInitial !== undefined) patch.last_initial = updates.lastInitial
+  if (updates.status !== undefined) patch.status = updates.status
+  if (updates.interests !== undefined) patch.interests = updates.interests
+  if (updates.availabilityBlocks !== undefined) {
+    patch.availability_blocks = updates.availabilityBlocks
+  }
+  if (updates.comfortSize !== undefined) patch.comfort_size = updates.comfortSize
+  if (updates.safetyPreference !== undefined) {
+    patch.safety_preference = updates.safetyPreference
+  }
+  if (updates.photoColor !== undefined) patch.photo_color = updates.photoColor
+  if (updates.avatarUrl !== undefined) patch.avatar_url = updates.avatarUrl
+  if (updates.completedOnboarding !== undefined) {
+    patch.completed_onboarding = updates.completedOnboarding
+  }
+
+  return patch
+}
+
+export async function updateProfile(
+  supabase: HuddleBrowserClient,
+  userId: string,
+  updates: Partial<HuddleProfile>
+): Promise<void> {
+  const patch = toProfileUpdate(updates)
+
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from("profiles").update(patch).eq("id", userId)
+    throwOnError(error, "Could not save your profile")
+  }
+
+  if (updates.gender !== undefined) {
+    await saveGender(supabase, userId, updates.gender)
+  }
+}
+
+async function saveGender(
+  supabase: HuddleBrowserClient,
+  userId: string,
+  gender: HuddleProfile["gender"]
+): Promise<void> {
+  const { error } = await supabase
+    .from("student_details")
+    .upsert({ profile_id: userId, gender: gender ?? null }, { onConflict: "profile_id" })
+
+  throwOnError(error, "Could not save your profile details")
+}
+
+export async function completeOnboarding(
+  supabase: HuddleBrowserClient,
+  userId: string,
+  input: OnboardingPayload
+): Promise<void> {
+  await updateProfile(supabase, userId, {
+    firstName: input.firstName,
+    lastInitial: input.lastInitial,
+    status: input.status,
+    interests: input.interests,
+    availabilityBlocks: input.availabilityBlocks,
+    comfortSize: input.comfortSize,
+    safetyPreference: input.safetyPreference,
+    gender: input.gender,
+    completedOnboarding: true,
+  })
+}
+
+export type RsvpOutcome = RsvpStatus | "full"
+
+export async function rsvpActivity(
+  supabase: HuddleBrowserClient,
+  activityId: string
+): Promise<RsvpOutcome> {
+  const { data, error } = await supabase.rpc("rsvp_activity", {
+    p_activity_id: activityId,
+  })
+
+  // The function raises 22023 when the activity is missing or no longer approved, which
+  // is a closed door rather than a failure the student should see as an error.
+  if (error?.code === "22023") {
+    return "full"
+  }
+
+  throwOnError(error, "Could not RSVP")
+  return (data ?? "going") as RsvpStatus
+}
+
+export async function leaveActivity(
+  supabase: HuddleBrowserClient,
+  activityId: string
+): Promise<void> {
+  const { error } = await supabase.rpc("leave_activity", {
+    p_activity_id: activityId,
+  })
+
+  throwOnError(error, "Could not leave the activity")
+}
+
+export async function createActivity(
+  supabase: HuddleBrowserClient,
+  hostId: string,
+  universityId: UniversityId,
+  input: CreateActivityPayload
+): Promise<HuddleActivity> {
+  const { data, error } = await supabase
+    .from("activities")
+    .insert({
+      title: input.title,
+      description: input.description,
+      category: input.category,
+      location_id: input.locationId,
+      host_id: hostId,
+      capacity: input.capacity,
+      start_time: input.startTime,
+      availability_block: input.availabilityBlock,
+      comfort_size: input.comfortSize,
+      safety_preference: input.safetyPreference,
+      university_id: universityId,
+    })
+    .select("*")
+    .single()
+
+  throwOnError(error, "Could not create the activity")
+
+  if (!data) {
+    throw new Error("Could not create the activity")
+  }
+
+  return toHuddleActivity(data)
+}
+
+export async function sendMessage(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+  userId: string,
+  body: string
+): Promise<ChatMessage> {
+  const { data, error } = await supabase
+    .from("messages")
+    .insert({ activity_id: activityId, user_id: userId, body })
+    .select("*")
+    .single()
+
+  throwOnError(error, "Could not send the message")
+
+  if (!data) {
+    throw new Error("Could not send the message")
+  }
+
+  return toChatMessage(data)
+}
+
+export async function reportSafetyConcern(
+  supabase: HuddleBrowserClient,
+  reporterId: string,
+  context: string,
+  reportedUserId?: string
+): Promise<SafetyReport> {
+  const { data, error } = await supabase
+    .from("safety_reports")
+    .insert({
+      reporter_id: reporterId,
+      reported_user_id: reportedUserId ?? null,
+      context,
+    })
+    .select("*")
+    .single()
+
+  throwOnError(error, "Could not send the report")
+
+  if (!data) {
+    throw new Error("Could not send the report")
+  }
+
+  return toSafetyReport(data)
+}
+
+export async function resolveFlag(
+  supabase: HuddleBrowserClient,
+  flagId: string,
+  status: FlagStatus
+): Promise<void> {
+  const { error } = await supabase.rpc("resolve_flag", {
+    p_flag_id: flagId,
+    p_status: status,
+  })
+
+  throwOnError(error, "Could not resolve the flag")
+}
+
+export async function reviewActivity(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+  status: Extract<ActivityStatus, "approved" | "rejected">
+): Promise<void> {
+  const { error } = await supabase.rpc("review_activity", {
+    p_activity_id: activityId,
+    p_status: status,
+  })
+
+  throwOnError(error, "Could not review the activity")
+}
+
+export async function addFriend(
+  supabase: HuddleBrowserClient,
+  userId: string,
+  friendId: string
+): Promise<FriendConnection | null> {
+  const { data, error } = await supabase
+    .from("friend_connections")
+    .insert({ user_id: userId, friend_id: friendId })
+    .select("*")
+    .maybeSingle()
+
+  // A duplicate request is a no-op rather than an error the student should see.
+  if (error && error.code === "23505") {
+    return null
+  }
+
+  throwOnError(error, "Could not send the friend request")
+  return data ? toFriendConnection(data) : null
+}

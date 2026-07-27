@@ -3,8 +3,9 @@
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
 import { ArrowRight, Check, GraduationCap, ShieldCheck, Sparkles } from "lucide-react"
+import { toast } from "sonner"
 import { CategoryIcon } from "@/components/huddle/category-icon"
-import { availabilityMeta, categoryMeta } from "@/lib/data/seed"
+import { availabilityMeta, categoryMeta } from "@/lib/data/metadata"
 import { useHuddle } from "@/lib/store/huddle-store"
 import type { AvailabilityBlock, Category, ComfortSize, Gender, SafetyPreference, StudentStatus } from "@/lib/types/huddle"
 
@@ -81,6 +82,7 @@ export default function OnboardingPage() {
   const [comfortSize, setComfortSize] = useState<ComfortSize>(currentProfile.comfortSize)
   const [safetyPreference, setSafetyPreference] = useState<SafetyPreference>(currentProfile.safetyPreference)
   const [gender, setGender] = useState<Gender | undefined>(currentProfile.gender)
+  const [saving, setSaving] = useState(false)
 
   const canContinue = useMemo(() => {
   if (step === 2) return interests.length >= 3 && interests.length <= 8
@@ -101,18 +103,26 @@ export default function OnboardingPage() {
     )
   }
 
-  const finish = () => {
-    completeOnboarding({
-      firstName: currentProfile.firstName,
-      lastInitial: currentProfile.lastInitial,
-      status,
-      gender,
-      interests,
-      availabilityBlocks: availability,
-      comfortSize,
-      safetyPreference,
-    })
-    router.push("/app")
+  const finish = async () => {
+    if (saving) return
+    setSaving(true)
+
+    try {
+      await completeOnboarding({
+        firstName: currentProfile.firstName,
+        lastInitial: currentProfile.lastInitial,
+        status,
+        gender,
+        interests,
+        availabilityBlocks: availability,
+        comfortSize,
+        safetyPreference,
+      })
+      router.push("/app")
+    } catch {
+      toast.error("Could not save your setup. Please try again.")
+      setSaving(false)
+    }
   }
 
   return (
@@ -265,11 +275,11 @@ export default function OnboardingPage() {
           </button>
           <button
             type="button"
-            onClick={() => (step === 5 ? finish() : setStep((prev) => prev + 1))}
-            disabled={!canContinue}
+            onClick={() => (step === 5 ? void finish() : setStep((prev) => prev + 1))}
+            disabled={!canContinue || saving}
             className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground disabled:opacity-45"
           >
-            {step === 5 ? "Enter Huddle" : "Continue"}
+            {step === 5 ? (saving ? "Saving…" : "Enter Huddle") : "Continue"}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>

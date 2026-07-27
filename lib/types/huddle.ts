@@ -49,19 +49,6 @@ export interface HuddleSession {
   universityId: UniversityId
 }
 
-export interface WaitlistEntry {
-  email: string
-  createdAt: string
-}
-
-export interface HuddleUser {
-  id: string
-  email: string
-  universityId: UniversityId
-  cohort: string
-  createdAt: string
-}
-
 export interface HuddleProfile {
   userId: string
   displayName: string
@@ -183,7 +170,6 @@ export interface AvailabilityMeta {
 
 export interface HuddleState {
   session: HuddleSession | null
-  users: HuddleUser[]
   profiles: HuddleProfile[]
   locations: HuddleLocation[]
   activities: HuddleActivity[]
@@ -193,7 +179,6 @@ export interface HuddleState {
   reports: SafetyReport[]
   pulses: Pulse[]
   friends: FriendConnection[]
-  waitlist: WaitlistEntry[]
 }
 
 export interface ActivityView extends HuddleActivity {

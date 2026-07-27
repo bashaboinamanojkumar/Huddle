@@ -19,6 +19,7 @@ export default function ChatThreadPage() {
   const router = useRouter()
   const { activities, state, currentUserId, sendMessage, reportSafetyConcern, leaveActivity } = useHuddle()
   const [body, setBody] = useState("")
+  const [sending, setSending] = useState(false)
   const activity = activities.find((item) => item.id === params.id)
 
   const messages = useMemo(
@@ -46,27 +47,42 @@ export default function ChatThreadPage() {
   const userRsvped = activity.userRsvp?.status === "going"
   const chatOpen = activity.goingCount >= 2 && userRsvped
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     const trimmed = body.trim()
-    if (!trimmed || archived || !chatOpen) return
+    if (!trimmed || archived || !chatOpen || sending) return
 
-    const message = sendMessage(activity.id, trimmed)
-    setBody("")
-    if (message.flagged) {
-      toast("Message sent and queued for human safety review.")
+    setSending(true)
+    try {
+      const message = await sendMessage(activity.id, trimmed)
+      setBody("")
+      if (message.flagged) {
+        toast("Message sent and queued for human safety review.")
+      }
+    } catch {
+      toast.error("Could not send your message. Please try again.")
+    } finally {
+      setSending(false)
     }
   }
 
-  const report = () => {
-    reportSafetyConcern(`Safety concern reported in chat: ${activity.title}`)
-    toast.success("Report sent to the review queue.")
+  const report = async () => {
+    try {
+      await reportSafetyConcern(`Safety concern reported in chat: ${activity.title}`)
+      toast.success("Report sent to the review queue.")
+    } catch {
+      toast.error("Could not send your report. Please try again.")
+    }
   }
 
-  const leave = () => {
-    leaveActivity(activity.id)
-    toast("You left the activity.")
-    router.push("/app")
+  const leave = async () => {
+    try {
+      await leaveActivity(activity.id)
+      toast("You left the activity.")
+      router.push("/app")
+    } catch {
+      toast.error("Could not leave the activity. Please try again.")
+    }
   }
 
   return (
@@ -83,7 +99,7 @@ export default function ChatThreadPage() {
               {formatActivityDate(activity.startTime)} at {formatActivityTime(activity.startTime)}
             </p>
           </div>
-          <button type="button" onClick={report} className="flex h-11 w-11 items-center justify-center rounded-full bg-coral/14 text-coral" aria-label="Report chat">
+          <button type="button" onClick={() => void report()} className="flex h-11 w-11 items-center justify-center rounded-full bg-coral/14 text-coral" aria-label="Report chat">
             <Flag className="h-5 w-5" />
           </button>
         </div>
@@ -152,19 +168,20 @@ export default function ChatThreadPage() {
             value={body}
             onChange={(event) => setBody(event.target.value)}
             disabled={archived || !chatOpen}
+            maxLength={2000}
             placeholder={archived ? "Archived chat" : "Message the group"}
             className="min-h-12 flex-1 rounded-2xl border border-white/10 bg-white/8 px-4 text-sm text-white outline-none placeholder:text-white/34 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={!body.trim() || archived || !chatOpen}
+            disabled={!body.trim() || archived || !chatOpen || sending}
             className="flex h-12 w-12 items-center justify-center rounded-2xl bg-secondary text-secondary-foreground disabled:opacity-40"
             aria-label="Send message"
           >
             <Send className="h-5 w-5" />
           </button>
         </div>
-        <button type="button" onClick={leave} className="mt-2 w-full rounded-2xl bg-white/6 px-4 py-3 text-xs font-bold text-white/56">
+        <button type="button" onClick={() => void leave()} className="mt-2 w-full rounded-2xl bg-white/6 px-4 py-3 text-xs font-bold text-white/56">
           Leave activity
         </button>
       </form>

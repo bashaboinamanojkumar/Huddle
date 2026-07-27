@@ -8,6 +8,21 @@ import { useHuddle } from "@/lib/store/huddle-store"
 export default function CommunityPage() {
   const { state, currentUserId, currentProfile, addFriend } = useHuddle()
   const [query, setQuery] = useState("")
+  const [pendingFriendId, setPendingFriendId] = useState<string | null>(null)
+
+  const sendRequest = async (friendId: string) => {
+    if (pendingFriendId) return
+    setPendingFriendId(friendId)
+
+    try {
+      await addFriend(friendId)
+      toast.success("Friend request sent.")
+    } catch {
+      toast.error("Could not send the request. Please try again.")
+    } finally {
+      setPendingFriendId(null)
+    }
+  }
 
   const leaderboard = useMemo(
     () => [...state.profiles].sort((a, b) => b.meetupsThisWeek - a.meetupsThisWeek || b.points - a.points),
@@ -132,11 +147,9 @@ export default function CommunityPage() {
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    addFriend(profile.userId)
-                    toast.success("Friend request sent.")
-                  }}
-                  className="rounded-xl bg-white px-3 py-2 text-xs font-black text-black"
+                  onClick={() => void sendRequest(profile.userId)}
+                  disabled={pendingFriendId !== null}
+                  className="rounded-xl bg-white px-3 py-2 text-xs font-black text-black disabled:opacity-50"
                 >
                   Add
                 </button>

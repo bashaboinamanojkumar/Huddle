@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useState } from "react"
-import { AlertTriangle, Award, MessageSquarePlus, RotateCcw, ShieldCheck, Siren, UserRound } from "lucide-react"
+import { AlertTriangle, Award, MessageSquarePlus, ShieldCheck, Siren, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { crisisResources } from "@/lib/config/crisis"
 import { getCategoryMeta } from "@/lib/format"
@@ -13,19 +13,23 @@ import { createClient } from "@/lib/supabase/client"
 
 export default function ProfilePage() {
   const router = useRouter()
-  const {
-    currentProfile,
-    state,
-    reportSafetyConcern,
-    resetDemo,
-    clearLocalSession,
-  } = useHuddle()
+  const { currentProfile, state, reportSafetyConcern, clearLocalSession } = useHuddle()
   const [isSigningOut, setIsSigningOut] = useState(false)
+  const [isReporting, setIsReporting] = useState(false)
   const email = state.session?.email
 
-  const report = () => {
-    reportSafetyConcern("General safety concern from profile screen")
-    toast.success("Safety concern sent to the review queue.")
+  const report = async () => {
+    if (isReporting) return
+    setIsReporting(true)
+
+    try {
+      await reportSafetyConcern("General safety concern from profile screen")
+      toast.success("Safety concern sent to the review queue.")
+    } catch {
+      toast.error("Could not send your report. Please try again.")
+    } finally {
+      setIsReporting(false)
+    }
   }
 
   const signOut = async () => {
@@ -169,11 +173,12 @@ export default function ProfilePage() {
         </div>
         <button
           type="button"
-          onClick={report}
-          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-coral px-4 py-3 text-sm font-black text-white"
+          onClick={() => void report()}
+          disabled={isReporting}
+          className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-coral px-4 py-3 text-sm font-black text-white disabled:opacity-60"
         >
           <AlertTriangle className="h-4 w-4" />
-          Report a concern
+          {isReporting ? "Sending…" : "Report a concern"}
         </button>
       </section>
 
@@ -186,17 +191,6 @@ export default function ProfilePage() {
           <Link href="/app/admin/review" className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold text-white">
             Safety review queue
           </Link>
-          <button
-            type="button"
-            onClick={() => {
-              resetDemo()
-              toast("Demo data reset.")
-            }}
-            className="flex items-center justify-center gap-2 rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold text-white"
-          >
-            <RotateCcw className="h-4 w-4" />
-            Reset demo data
-          </button>
           <button
             type="button"
             onClick={() => void signOut()}

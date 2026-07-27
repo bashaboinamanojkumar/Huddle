@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { Calendar, MapPin, Minus, TrendingUp, UsersRound, Zap } from "lucide-react"
 import { toast } from "sonner"
@@ -10,21 +11,32 @@ import type { ActivityView } from "@/lib/types/huddle"
 
 export function ActivityCard({ activity }: { activity: ActivityView }) {
   const { rsvpActivity, leaveActivity } = useHuddle()
+  const [pending, setPending] = useState(false)
   const category = getCategoryMeta(activity.category)
   const isGoing = activity.userRsvp?.status === "going"
   const isWaitlisted = activity.userRsvp?.status === "waitlisted"
   const isFull = activity.seatsLeft === 0 && !isGoing
 
-  const toggleRsvp = () => {
-    if (isGoing || isWaitlisted) {
-      leaveActivity(activity.id)
-      toast("You left this activity.")
-      return
-    }
+  const toggleRsvp = async () => {
+    if (pending) return
+    setPending(true)
 
-    const status = rsvpActivity(activity.id)
-    if (status === "going") toast.success("You are going. Chat opens when the group has 2+ students.")
-    if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
+    try {
+      if (isGoing || isWaitlisted) {
+        await leaveActivity(activity.id)
+        toast("You left this activity.")
+        return
+      }
+
+      const status = await rsvpActivity(activity.id)
+      if (status === "going") toast.success("You are going. Chat opens when the group has 2+ students.")
+      if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
+      if (status === "full") toast("This activity is no longer open.")
+    } catch {
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -101,7 +113,8 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
         <button
           type="button"
           onClick={toggleRsvp}
-          className={`rounded-2xl px-5 py-3 text-sm font-bold ${
+          disabled={pending}
+          className={`rounded-2xl px-5 py-3 text-sm font-bold disabled:opacity-50 ${
             isGoing
               ? "bg-mint/18 text-mint"
               : isWaitlisted

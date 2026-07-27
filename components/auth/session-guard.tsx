@@ -96,7 +96,7 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
           user_metadata: Record<string, unknown>
         }
         settled.current = true
-        const destination = bridgeAuthenticatedUser(
+        const destination = await bridgeAuthenticatedUser(
           {
             id: user.id,
             email: user.email,
@@ -133,7 +133,15 @@ export function SessionGuard({ children }: { children: React.ReactNode }) {
       router.replace(`/verify?${query.toString()}`)
     }
 
-    void synchronize()
+    // Adopting a session now reads from Supabase, so a transport failure here must land on
+    // the retry notice rather than leaving the guard spinning forever.
+    void synchronize().catch(() => {
+      if (active) {
+        settled.current = true
+        setStatus("unavailable")
+      }
+    })
+
     return () => {
       active = false
     }

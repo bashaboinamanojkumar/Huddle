@@ -5,7 +5,7 @@ import Link from "next/link"
 import { CalendarClock, CheckCircle2, Flag, MapPin, ShieldAlert } from "lucide-react"
 import { toast } from "sonner"
 import { CategoryIcon } from "@/components/huddle/category-icon"
-import { categoryMeta } from "@/lib/data/seed"
+import { categoryMeta } from "@/lib/data/metadata"
 import { featureFlags } from "@/lib/config/flags"
 import { useHuddle } from "@/lib/store/huddle-store"
 import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference } from "@/lib/types/huddle"
@@ -13,6 +13,7 @@ import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference } from 
 export default function HostPage() {
   const { state, createActivity } = useHuddle()
   const [createdId, setCreatedId] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [category, setCategory] = useState<Category>("coffee")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
@@ -42,28 +43,37 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
     capacity >= 2 &&
     capacity <= 8
 
-  const submit = (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!canSubmit) {
-      toast.error("Complete every field and keep limits in range.")
+    if (!canSubmit || submitting) {
+      if (!canSubmit) {
+        toast.error("Complete every field and keep limits in range.")
+      }
       return
     }
 
-    const activity = createActivity({
-      title: title.trim(),
-      description: useCustomLocation && customLocation.trim()
-      ? `${description.trim()}\n\nSuggested meet point: ${customLocation.trim()}`
-      : description.trim(),
-      category,
-      locationId,
-      capacity,
-      startTime: new Date(startTime).toISOString(),
-      availabilityBlock,
-      comfortSize,
-      safetyPreference,
-    })
-    setCreatedId(activity.id)
-    toast.success("Draft sent to review. It is hidden until approved.")
+    setSubmitting(true)
+    try {
+      const activity = await createActivity({
+        title: title.trim(),
+        description: useCustomLocation && customLocation.trim()
+        ? `${description.trim()}\n\nSuggested meet point: ${customLocation.trim()}`
+        : description.trim(),
+        category,
+        locationId,
+        capacity,
+        startTime: new Date(startTime).toISOString(),
+        availabilityBlock,
+        comfortSize,
+        safetyPreference,
+      })
+      setCreatedId(activity.id)
+      toast.success("Draft sent to review. It is hidden until approved.")
+    } catch {
+      toast.error("Could not send your activity to review. Please try again.")
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -283,10 +293,10 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
 
         <button
           type="submit"
-          disabled={!canSubmit}
+          disabled={!canSubmit || submitting}
           className="safe-pb w-full rounded-2xl bg-secondary px-5 py-4 text-sm font-black text-secondary-foreground disabled:opacity-45"
         >
-          Send to review
+          {submitting ? "Sending…" : "Send to review"}
         </button>
       </form>
     </div>

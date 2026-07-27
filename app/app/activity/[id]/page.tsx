@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Calendar, Flag, MapPin, MessageCircle, ShieldCheck, UsersRound } from "lucide-react"
@@ -14,6 +15,7 @@ export default function ActivityDetailPage() {
   const router = useRouter()
   const { activities, state, rsvpActivity, leaveActivity, reportSafetyConcern } = useHuddle()
   const { events: terplinkEvents } = useTerplinkEvents()
+  const [pending, setPending] = useState(false)
   const terplinkViews = terplinkEvents.map((event) => ({
     ...event,
     location: state.locations.find((l) => l.id === event.locationId) ?? state.locations[0],
@@ -47,17 +49,28 @@ export default function ActivityDetailPage() {
   const isFull = activity.seatsLeft === 0 && !isGoing
   const chatOpen = activity.goingCount >= 2 && isGoing
 
-  const toggleRsvp = () => {
-    if (isGoing || isWaitlisted) {
-      leaveActivity(activity.id)
-      toast("You left this activity.")
-      return
+  const toggleRsvp = async () => {
+    if (pending) return
+    setPending(true)
+
+    try {
+      if (isGoing || isWaitlisted) {
+        await leaveActivity(activity.id)
+        toast("You left this activity.")
+        return
+      }
+
+      const status = await rsvpActivity(activity.id)
+      if (status === "going") {
+        toast.success("You are going.")
+      }
+      if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
+      if (status === "full") toast("This activity is no longer open.")
+    } catch {
+      toast.error("Something went wrong. Please try again.")
+    } finally {
+      setPending(false)
     }
-    const status = rsvpActivity(activity.id)
-    if (status === "going") {
-      toast.success("You are going.")
-    }
-    if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
   }
 
   const addToCalendar = () => {
@@ -68,9 +81,16 @@ export default function ActivityDetailPage() {
     window.open(url, "_blank")
   }
 
-  const report = () => {
-    reportSafetyConcern(`Safety concern reported on activity: ${activity.title}`, activity.hostId)
-    toast.success("Report sent to the review queue.")
+  const report = async () => {
+    try {
+      await reportSafetyConcern(
+        `Safety concern reported on activity: ${activity.title}`,
+        activity.hostId
+      )
+      toast.success("Report sent to the review queue.")
+    } catch {
+      toast.error("Could not send your report. Please try again.")
+    }
   }
 
   return (
@@ -121,8 +141,9 @@ export default function ActivityDetailPage() {
         <div className="mt-4 grid grid-cols-2 gap-3">
           <button
             type="button"
-            onClick={toggleRsvp}
-            className={`rounded-2xl px-4 py-4 text-sm font-bold ${
+            onClick={() => void toggleRsvp()}
+            disabled={pending}
+            className={`rounded-2xl px-4 py-4 text-sm font-bold disabled:opacity-50 ${
               isGoing
                 ? "bg-mint/18 text-mint"
                 : isWaitlisted
@@ -186,7 +207,7 @@ export default function ActivityDetailPage() {
 
         <button
           type="button"
-          onClick={report}
+          onClick={() => void report()}
           className="mt-5 flex w-full items-center justify-center gap-2 rounded-2xl border border-coral/30 bg-coral/12 px-4 py-4 text-sm font-bold text-coral"
         >
           <Flag className="h-4 w-4" />

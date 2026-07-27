@@ -7,7 +7,7 @@ import { Bell, Search, ShieldAlert } from "lucide-react"
 import { ActivityCard } from "@/components/huddle/activity-card"
 
 import { useHuddle } from "@/lib/store/huddle-store"
-import { categoryMeta } from "@/lib/data/seed"
+import { categoryMeta } from "@/lib/data/metadata"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {

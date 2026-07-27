@@ -11,12 +11,17 @@ node_modules/
 Huddle_Build_Detailed.md.docx
 _docx_extracted.xml
 _plan.txt
-/supabase/
 .pnpm-store/
 tsconfig.tsbuildinfo
 
 # Vercel CLI
 .vercel
+
+# Supabase CLI scratch space. Migrations are the schema's source of truth and stay tracked.
+supabase/.branches/
+supabase/.temp/
+# Superseded pre-rebuild draft that was never applied and no longer matches the database.
+supabase/schema.sql
 
 # Environment files: ignore every variant, keep the checked-in template.
 # The negation must stay after the wildcard or it has no effect.
