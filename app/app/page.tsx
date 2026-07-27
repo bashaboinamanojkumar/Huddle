@@ -1,5 +1,7 @@
 "use client"
 
+import { EventsMap } from "@/components/huddle/events-map"
+import { List, Map as MapIcon } from "lucide-react"
 import { useTerplinkEvents } from "@/hooks/use-terplink-events"
 import { useMemo, useState } from "react"
 import Link from "next/link"
@@ -15,6 +17,7 @@ export default function ActivityFeedPage() {
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
+  const [view, setView] = useState<"list" | "map">("list")
   const { events: terplinkEvents } = useTerplinkEvents()
   const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
 
@@ -162,22 +165,44 @@ const filtered = useMemo(() => {
         </div>
 
         <div className="mt-4 flex items-center justify-between">
-          <div>
-            <h2 className="font-heading text-xl font-black text-white">Best matches</h2>
+        <div>
+          <h2 className="font-heading text-xl font-black text-white">Best matches</h2>
             <p className="mt-1 text-xs text-white/46">
               Sorted by interests, availability, and comfort.
             </p>
-          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setView("list")}
+            className={`flex h-9 w-9 items-center justify-center rounded-2xl ${view === "list" ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/60"}`}
+          >
+            <List className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("map")}
+            className={`flex h-9 w-9 items-center justify-center rounded-2xl ${view === "map" ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/60"}`}
+          >
+            <MapIcon className="h-4 w-4" />
+          </button>
           <Link href="/crisis" className="flex h-11 w-11 items-center justify-center rounded-full bg-coral/18 text-coral" aria-label="Safety resources">
             <ShieldAlert className="h-5 w-5" />
           </Link>
         </div>
+        </div>
 
-        <div className="mt-4 space-y-4">
-          {filtered.map((activity) => (
+        {view === "map" ? (
+          <div className="mt-4">
+            <EventsMap activities={filtered} />
+          </div>
+        ) : (
+          <div className="mt-4 space-y-4">
+            {filtered.map((activity) => (
             <ActivityCard key={activity.id} activity={activity} />
           ))}
-        </div>
+          </div>
+        )}
 
         {filtered.length === 0 && (
           <div className="glass-card mt-6 rounded-[2rem] p-6 text-center">
