@@ -8,27 +8,13 @@ import { toast } from "sonner"
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { formatActivityDate, formatActivityTime, getCategoryMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
-import { useTerplinkEvents } from "@/hooks/use-terplink-events"
 
 export default function ActivityDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const { activities, state, rsvpActivity, leaveActivity, reportSafetyConcern } = useHuddle()
-  const { events: terplinkEvents } = useTerplinkEvents()
+  const { activities, rsvpActivity, leaveActivity, reportSafetyConcern } = useHuddle()
   const [pending, setPending] = useState(false)
-  const terplinkViews = terplinkEvents.map((event) => ({
-    ...event,
-    location: state.locations.find((l) => l.id === event.locationId) ?? state.locations[0],
-    host: state.profiles[0],
-    attendees: [],
-    goingCount: 0,
-    seatsLeft: event.capacity,
-    userRsvp: undefined,
-    fitScore: 50,
-    sharedInterests: [],
-  }))
-  const allActivities = [...activities, ...terplinkViews]
-  const activity = allActivities.find((item) => item.id === params.id)
+  const activity = activities.find((item) => item.id === params.id)
 
   if (!activity) {
     return (
@@ -85,7 +71,7 @@ export default function ActivityDetailPage() {
     try {
       await reportSafetyConcern(
         `Safety concern reported on activity: ${activity.title}`,
-        activity.hostId
+        activity.hostId ?? undefined
       )
       toast.success("Report sent to the review queue.")
     } catch {

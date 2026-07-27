@@ -2,7 +2,6 @@
 
 import { EventsMap } from "@/components/huddle/events-map"
 import { List, Map as MapIcon } from "lucide-react"
-import { useTerplinkEvents } from "@/hooks/use-terplink-events"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Bell, Search, ShieldAlert } from "lucide-react"
@@ -13,63 +12,35 @@ import { categoryMeta } from "@/lib/data/metadata"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile, state } = useHuddle()
+  const { approvedActivities, currentProfile, universityId } = useHuddle()
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
   const [view, setView] = useState<"list" | "map">("list")
-  const { events: terplinkEvents } = useTerplinkEvents()
-  const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
 
-  const allActivities = useMemo(() => {
-  const terplinkViews = terplinkEvents
-  .filter((event) => new Date(event.startTime) > new Date() && event.universityId === userUniversityId)
-  .flatMap((event) => {
-    // Locations load from Supabase, so they can still be empty when the TerpLink
-    // fetch resolves. Hold the event back until its meet-point is known.
-    const location = state.locations.find((l) => l.id === event.locationId)
-    const host = state.profiles[0]
-    if (!location || !host) {
-      return []
-    }
-    return [{
-      ...event,
-      location,
-      host,
-      attendees: [],
-      goingCount: 0,
-      seatsLeft: event.capacity,
-      userRsvp: undefined,
-      fitScore: 50,
-      sharedInterests: [],
-    }]
-  })
-  return [...approvedActivities, ...terplinkViews]
-  }, [approvedActivities, terplinkEvents, state.locations, state.profiles, userUniversityId])
-
-const filtered = useMemo(() => {
-  return allActivities
-    .filter((activity) => {
-      const matchesCategory = category === "all" || activity.category === category
-      const matchesBlock = date === "all" || activity.startTime.startsWith(date)
-      const query = search.trim().toLowerCase()
-      const matchesSearch =
-        !query ||
-        activity.title.toLowerCase().includes(query) ||
-        activity.description.toLowerCase().includes(query) ||
-        activity.location.name.toLowerCase().includes(query)
-      return matchesCategory && matchesBlock && matchesSearch
-    })
-    .sort((a, b) => {
-      const aMatchesCategory = category === "all" || a.category === category
-      const bMatchesCategory = category === "all" || b.category === category
-      const aMatchesBlock = date === "all" || a.startTime.startsWith(date)
-      const bMatchesBlock = date === "all" || b.startTime.startsWith(date)
-      const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
-      const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
-      return bScore - aScore
-    })
-}, [allActivities, date, category, search])
+  const filtered = useMemo(() => {
+    return approvedActivities
+      .filter((activity) => {
+        const matchesCategory = category === "all" || activity.category === category
+        const matchesBlock = date === "all" || activity.startTime.startsWith(date)
+        const query = search.trim().toLowerCase()
+        const matchesSearch =
+          !query ||
+          activity.title.toLowerCase().includes(query) ||
+          activity.description.toLowerCase().includes(query) ||
+          activity.location.name.toLowerCase().includes(query)
+        return matchesCategory && matchesBlock && matchesSearch
+      })
+      .sort((a, b) => {
+        const aMatchesCategory = category === "all" || a.category === category
+        const bMatchesCategory = category === "all" || b.category === category
+        const aMatchesBlock = date === "all" || a.startTime.startsWith(date)
+        const bMatchesBlock = date === "all" || b.startTime.startsWith(date)
+        const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
+        const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
+        return bScore - aScore
+      })
+  }, [approvedActivities, date, category, search])
 
   return (
     <div className="min-h-full bg-background">
@@ -77,7 +48,7 @@ const filtered = useMemo(() => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
-                {userUniversityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
+                {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
             </p>
             <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
               Good to see you, {currentProfile.firstName}.
@@ -95,7 +66,7 @@ const filtered = useMemo(() => {
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-3xl bg-black/18 p-3">
-            <p className="font-heading text-2xl font-black text-white">{allActivities.length}</p>
+            <p className="font-heading text-2xl font-black text-white">{approvedActivities.length}</p>
             <p className="text-[11px] text-white/62">joinable</p>
           </div>
           <div className="rounded-3xl bg-black/18 p-3">
@@ -156,7 +127,7 @@ const filtered = useMemo(() => {
             All dates
           </button>
           {Array.from(
-            new Set(allActivities.map((a) => a.startTime.slice(0, 10)))
+            new Set(approvedActivities.map((a) => a.startTime.slice(0, 10)))
           )
           .sort()
           .map((d) => (
@@ -217,7 +188,7 @@ const filtered = useMemo(() => {
           <div className="glass-card mt-6 rounded-[2rem] p-6 text-center">
             <h3 className="font-heading text-lg font-bold text-white">No matches for this filter</h3>
             <p className="mt-2 text-sm leading-6 text-white/56">
-              Seeded activities are still available. Clear filters to see the launch board.
+              Clear the filters to see everything happening on campus.
             </p>
             <button
               type="button"

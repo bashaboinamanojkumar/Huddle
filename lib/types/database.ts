@@ -23,7 +23,9 @@ export type Database = {
           comfort_size: Database["public"]["Enums"]["comfort_size"]
           created_at: string
           description: string
-          host_id: string
+          external_id: string | null
+          external_url: string | null
+          host_id: string | null
           id: string
           location_id: string
           safety_preference: Database["public"]["Enums"]["safety_preference"]
@@ -42,7 +44,9 @@ export type Database = {
           comfort_size?: Database["public"]["Enums"]["comfort_size"]
           created_at?: string
           description?: string
-          host_id: string
+          external_id?: string | null
+          external_url?: string | null
+          host_id?: string | null
           id?: string
           location_id: string
           safety_preference?: Database["public"]["Enums"]["safety_preference"]
@@ -61,7 +65,9 @@ export type Database = {
           comfort_size?: Database["public"]["Enums"]["comfort_size"]
           created_at?: string
           description?: string
-          host_id?: string
+          external_id?: string | null
+          external_url?: string | null
+          host_id?: string | null
           id?: string
           location_id?: string
           safety_preference?: Database["public"]["Enums"]["safety_preference"]

@@ -70,6 +70,8 @@ function activityRow(overrides: Partial<ActivityRow> = {}): ActivityRow {
     category: "coffee",
     location_id: "loc-stamp",
     host_id: "host-1",
+    external_id: null,
+    external_url: null,
     capacity: 4,
     start_time: "2026-07-28T18:00:00.000Z",
     availability_block: "weekday_evening",
@@ -131,6 +133,21 @@ describe("activity mapping", () => {
 
   it("defaults an unrecognized campus to the pilot campus", () => {
     expect(toHuddleActivity(activityRow({ university_id: "other" })).universityId).toBe("umd")
+  })
+
+  it("carries a null host through for campus org listings", () => {
+    const row = activityRow({ source: "org", host_id: null })
+    expect(toHuddleActivity(row).hostId).toBeNull()
+  })
+
+  it("exposes the source listing url so org events can link out", () => {
+    const row = activityRow({
+      source: "org",
+      external_url: "https://terplink.umd.edu/event/12478027",
+    })
+    expect(toHuddleActivity(row).externalUrl).toBe(
+      "https://terplink.umd.edu/event/12478027"
+    )
   })
 })
 
