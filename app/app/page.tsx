@@ -22,7 +22,8 @@ export default function ActivityFeedPage() {
     return approvedActivities
       .filter((activity) => {
         const matchesCategory = category === "all" || activity.category === category
-        const matchesBlock = date === "all" || activity.startTime.startsWith(date)
+        const activityLocalDate = new Date(activity.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
+        const matchesBlock = date === "all" || activityLocalDate === date
         const query = search.trim().toLowerCase()
         const matchesSearch =
           !query ||
@@ -34,8 +35,8 @@ export default function ActivityFeedPage() {
       .sort((a, b) => {
         const aMatchesCategory = category === "all" || a.category === category
         const bMatchesCategory = category === "all" || b.category === category
-        const aMatchesBlock = date === "all" || a.startTime.startsWith(date)
-        const bMatchesBlock = date === "all" || b.startTime.startsWith(date)
+        const aMatchesBlock = date === "all" || new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
+        const bMatchesBlock = date === "all" || new Date(b.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
         const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
         const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
         return bScore - aScore
@@ -127,7 +128,11 @@ export default function ActivityFeedPage() {
             All dates
           </button>
           {Array.from(
-            new Set(approvedActivities.map((a) => a.startTime.slice(0, 10)))
+            new Set(
+              approvedActivities.map((a) =>
+                new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
+              )
+            )
           )
           .sort()
           .map((d) => (
