@@ -13,7 +13,7 @@ import { categoryMeta } from "@/lib/data/metadata"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile, state } = useHuddle()
+  const { approvedActivities, currentProfile, currentUserId, state } = useHuddle()
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
@@ -22,20 +22,21 @@ export default function ActivityFeedPage() {
   const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
 
   const allActivities = useMemo(() => {
+  const systemHost = currentProfile
   const terplinkViews = terplinkEvents
   .filter((event) => new Date(event.startTime) > new Date() && event.universityId === userUniversityId)
   .flatMap((event) => {
-    // Locations load from Supabase, so they can still be empty when the TerpLink
-    // fetch resolves. Hold the event back until its meet-point is known.
-    const location = state.locations.find((l) => l.id === event.locationId)
-    const host = state.profiles[0]
-    if (!location || !host) {
-      return []
+    const location = state.locations.find((l) => l.id === event.locationId) ?? {
+      id: event.locationId,
+      universityId: "umd" as const,
+      name: event.locationId,
+      area: "UMD Campus",
+      safetyNote: "Please check TerpLink for exact location details.",
     }
     return [{
       ...event,
       location,
-      host,
+      host: systemHost,
       attendees: [],
       goingCount: 0,
       seatsLeft: event.capacity,
@@ -44,8 +45,10 @@ export default function ActivityFeedPage() {
       sharedInterests: [],
     }]
   })
-  return [...approvedActivities, ...terplinkViews]
-  }, [approvedActivities, terplinkEvents, state.locations, state.profiles, userUniversityId])
+  const approvedIds = new Set(approvedActivities.map((a) => a.id))
+  const dedupedTerplink = terplinkViews.filter((a) => !approvedIds.has(a.id))
+  return [...approvedActivities, ...dedupedTerplink]
+  }, [approvedActivities, terplinkEvents, state.locations, state.profiles, userUniversityId, currentUserId])
 
 const filtered = useMemo(() => {
   return allActivities
