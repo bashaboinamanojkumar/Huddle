@@ -1,6 +1,7 @@
 "use client"
 
-import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps"
+import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps"
+import { useEffect } from "react"
 
 const locationCoords: Record<string, { lat: number; lng: number }> = {
   "loc-mckeldin": { lat: 38.9858, lng: -76.9448 },
@@ -15,6 +16,16 @@ const locationCoords: Record<string, { lat: number; lng: number }> = {
   "loc-eppley-pool": { lat: 38.9921, lng: -76.9450 },
   "loc-golf-course": { lat: 38.9800, lng: -76.9350 },
   "loc-paint-branch": { lat: 38.9950, lng: -76.9380 },
+}
+
+function MapPanner({ coords }: { coords: { lat: number; lng: number } }) {
+  const map = useMap()
+  useEffect(() => {
+    if (map && coords) {
+      map.panTo(coords)
+    }
+  }, [map, coords])
+  return null
 }
 
 export function LocationMap({ locationId }: { locationId: string }) {
@@ -34,6 +45,7 @@ export function LocationMap({ locationId }: { locationId: string }) {
           disableDefaultUI
           style={{ width: "100%", height: "200px" }}
         >
+          <MapPanner coords={coords} />
           <Marker position={coords} />
         </Map>
       </div>
