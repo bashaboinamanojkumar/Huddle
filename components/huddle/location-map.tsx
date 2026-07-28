@@ -4,18 +4,18 @@ import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps"
 import { useEffect } from "react"
 
 const locationCoords: Record<string, { lat: number; lng: number }> = {
-  "loc-mckeldin": { lat: 38.9858, lng: -76.9448 },
-  "loc-stamp": { lat: 38.9888, lng: -76.9444 },
-  "loc-board-brew": { lat: 38.9826, lng: -76.9388 },
-  "loc-eppley": { lat: 38.9923, lng: -76.9448 },
-  "loc-hornbake": { lat: 38.9872, lng: -76.9418 },
-  "loc-tawes": { lat: 38.9864, lng: -76.9432 },
-  "loc-eppley-gym": { lat: 38.9923, lng: -76.9448 },
-  "loc-eppley-pickleball": { lat: 38.9925, lng: -76.9442 },
-  "loc-eppley-tennis": { lat: 38.9927, lng: -76.9440 },
-  "loc-eppley-pool": { lat: 38.9921, lng: -76.9450 },
-  "loc-golf-course": { lat: 38.9800, lng: -76.9350 },
-  "loc-paint-branch": { lat: 38.9950, lng: -76.9380 },
+  "loc-mckeldin": { lat: 38.9859, lng: -76.9451 },       // McKeldin Library - verified
+  "loc-stamp": { lat: 38.9881, lng: -76.9450 },           // Stamp Student Union - verified
+  "loc-board-brew": { lat: 38.9820, lng: -76.9370 },      // Board & Brew College Park
+  "loc-eppley": { lat: 38.9917, lng: -76.9431 },          // Eppley Recreation Center
+  "loc-hornbake": { lat: 38.9869, lng: -76.9433 },        // Hornbake Plaza
+  "loc-tawes": { lat: 38.9857, lng: -76.9419 },           // Tawes Plaza
+  "loc-eppley-gym": { lat: 38.9917, lng: -76.9431 },      // Eppley Gym (same building)
+  "loc-eppley-pickleball": { lat: 38.9920, lng: -76.9425 }, // Eppley outdoor courts
+  "loc-eppley-tennis": { lat: 38.9922, lng: -76.9422 },   // Eppley tennis courts
+  "loc-eppley-pool": { lat: 38.9915, lng: -76.9435 },     // Eppley pool
+  "loc-golf-course": { lat: 38.9785, lng: -76.9340 },     // UMD Golf Course
+  "loc-paint-branch": { lat: 38.9955, lng: -76.9372 },    // Paint Branch Trail
 }
 
 function MapPanner({ coords }: { coords: { lat: number; lng: number } }) {
