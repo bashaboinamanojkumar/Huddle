@@ -30,7 +30,7 @@ export function LocationMap({ locationId }: { locationId: string }) {
         <Map
           defaultCenter={coords}
           defaultZoom={16}
-          gestureHandling="none"
+          gestureHandling="cooperative"
           disableDefaultUI
           style={{ width: "100%", height: "200px" }}
         >
