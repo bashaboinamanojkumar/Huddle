@@ -1,5 +1,6 @@
 "use client"
 
+import { LocationMap } from "@/components/huddle/location-map"
 import { useState, useMemo } from "react"
 import Link from "next/link"
 import { CalendarClock, CheckCircle2, Flag, MapPin, ShieldAlert } from "lucide-react"
@@ -189,7 +190,7 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
                 useCustomLocation ? "border-secondary bg-secondary/18 text-white" : "border-white/10 bg-white/6 text-white/72"
               }`}
             >
-              📍 Suggest a new location
+              Suggest a new location
             </button>
             {useCustomLocation && (
               <input
@@ -205,6 +206,9 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
               </p>
             )}
           </div>
+          {locationId && !useCustomLocation && (
+            <LocationMap locationId={locationId} />
+          )}
         </section>
 
         <section className="glass-card rounded-[2rem] p-5">
