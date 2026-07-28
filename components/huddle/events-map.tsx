@@ -28,13 +28,14 @@ export function EventsMap({ activities }: { activities: ActivityView[] }) {
 
   return (
     <APIProvider apiKey={process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY!}>
-      <div className="h-[420px] w-full overflow-hidden rounded-[2rem]">
+      <div className="h-[420px] w-full overflow-hidden rounded-[2rem]" style={{ minHeight: "420px", height: "420px" }}>
         <Map
           defaultCenter={UMD_CENTER}
           defaultZoom={15}
           mapId="huddle-events-map"
           gestureHandling="greedy"
           disableDefaultUI={false}
+          style={{ width: "100%", height: "420px" }}
         >
           {activities.map((activity) => {
             const coords = locationCoords[activity.locationId]
