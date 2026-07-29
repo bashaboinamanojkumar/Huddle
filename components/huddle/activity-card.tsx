@@ -29,8 +29,8 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
       }
 
       const status = await rsvpActivity(activity.id)
-      if (status === "going") toast.success("You are going. Chat opens when the group has 2+ students.")
-      if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
+      if (status === "going") toast.success("Paws in! Chat opens when the group has 2+ students.")
+      if (status === "waitlisted") toast("This activity is full — you're on the waitlist.")
       if (status === "full") toast("This activity is no longer open.")
     } catch {
       toast.error("Something went wrong. Please try again.")
@@ -124,7 +124,7 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
               : "bg-secondary text-secondary-foreground"
           }`}
         >
-          {isGoing ? "Going" : isWaitlisted ? "Waitlisted" : isFull ? "Waitlist" : "RSVP"}
+          {isGoing ? "Going" : isWaitlisted ? "Waitlisted" : isFull ? "Join waitlist" : "Huddle up"}
         </button>
       </div>
     </article>

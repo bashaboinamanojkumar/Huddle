@@ -48,7 +48,7 @@ export default function ActivityDetailPage() {
   const isWaitlisted = activity.userRsvp?.status === "waitlisted"
   const isFull = activity.seatsLeft === 0 && !isGoing
   const chatOpen = activity.goingCount >= 2 && isGoing
-
+  const [showRipple, setShowRipple] = useState(false)
   const toggleRsvp = async () => {
     if (pending) return
     setPending(true)
@@ -62,9 +62,11 @@ export default function ActivityDetailPage() {
 
       const status = await rsvpActivity(activity.id)
       if (status === "going") {
-        toast.success("You are going.")
+        toast.success("Spot is yours!")
+        setShowRipple(true)
+        setTimeout(() => setShowRipple(false), 1500)
       }
-      if (status === "waitlisted") toast("This activity is full, so you joined the waitlist.")
+      if (status === "waitlisted") toast("This activity is full — you're on the waitlist.")
       if (status === "full") toast("This activity is no longer open.")
     } catch {
       toast.error("Something went wrong. Please try again.")
@@ -153,7 +155,7 @@ export default function ActivityDetailPage() {
                 : "bg-secondary text-secondary-foreground"
             }`}
           >
-            {isGoing ? "Leave" : isWaitlisted ? "Leave waitlist" : isFull ? "Join waitlist" : "RSVP"}
+            {isGoing ? "Leave" : isWaitlisted ? "Leave waitlist" : isFull ? "Join waitlist" : "Huddle up"}
           </button>
           <Link
             href={chatOpen ? `/app/chats/${activity.id}` : isGoing ? "/app/chats" : "#attendees"}
@@ -213,6 +215,13 @@ export default function ActivityDetailPage() {
           <Flag className="h-4 w-4" />
           Report or safety concern
         </button>
+        {showRipple && (
+          <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+          <div className="animate-ping h-32 w-32 rounded-full bg-secondary/30" />
+          <div className="absolute animate-ping h-20 w-20 rounded-full bg-secondary/40" style={{ animationDelay: "0.15s" }} />
+          <div className="absolute animate-ping h-10 w-10 rounded-full bg-secondary/50" style={{ animationDelay: "0.3s" }} />
+          </div>
+        )}
       </main>
     </div>
   )
