@@ -1,74 +1,91 @@
 "use client"
 
-import { EventsMap } from "@/components/huddle/events-map"
-import { List, Map as MapIcon } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useMemo } from "react"
 import Link from "next/link"
-import { Bell, Search, ShieldAlert } from "lucide-react"
+import { CalendarHeart, ChevronRight, Share2, UserPlus, UsersRound } from "lucide-react"
+import { toast } from "sonner"
 import { ActivityCard } from "@/components/huddle/activity-card"
-
 import { useHuddle } from "@/lib/store/huddle-store"
-import { categoryMeta } from "@/lib/data/metadata"
-import type { Category } from "@/lib/types/huddle"
+import { formatActivityDate, formatActivityTime } from "@/lib/format"
 
-export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile, universityId } = useHuddle()
-  const [category, setCategory] = useState<Category | "all">("all")
-  const [date, setDate] = useState<string>("all")
-  const [search, setSearch] = useState("")
-  const [view, setView] = useState<"list" | "map">("list")
+export default function FeedPage() {
+  const { approvedActivities, currentProfile, currentUserId, state, addFriend } = useHuddle()
 
-  const filtered = useMemo(() => {
-    return approvedActivities
-      .filter((activity) => {
-        const matchesCategory = category === "all" || activity.category === category
-        const activityLocalDate = new Date(activity.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
-        const matchesBlock = date === "all" || activityLocalDate === date
-        const query = search.trim().toLowerCase()
-        const matchesSearch =
-          !query ||
-          activity.title.toLowerCase().includes(query) ||
-          activity.description.toLowerCase().includes(query) ||
-          activity.location.name.toLowerCase().includes(query)
-        return matchesCategory && matchesBlock && matchesSearch
-      })
-      .sort((a, b) => {
-        const aMatchesCategory = category === "all" || a.category === category
-        const bMatchesCategory = category === "all" || b.category === category
-        const aMatchesBlock = date === "all" || new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
-        const bMatchesBlock = date === "all" || new Date(b.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
-        const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
-        const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
-        return bScore - aScore
-      })
-  }, [approvedActivities, date, category, search])
+  const attendingActivities = useMemo(
+    () => approvedActivities.filter((a) => a.userRsvp?.status === "going"),
+    [approvedActivities]
+  )
+
+  const leaderboard = useMemo(
+    () => [...state.profiles].sort((a, b) => b.meetupsThisWeek - a.meetupsThisWeek || b.points - a.points),
+    [state.profiles]
+  )
+
+  const myFriendIds = useMemo(
+    () => new Set(state.friends.filter((f) => f.userId === currentUserId).map((f) => f.friendId)),
+    [state.friends, currentUserId]
+  )
+
+  const myFriends = useMemo(
+    () => state.friends
+      .filter((f) => f.userId === currentUserId)
+      .map((f) => ({ connection: f, profile: state.profiles.find((p) => p.userId === f.friendId) }))
+      .filter((item) => item.profile),
+    [state.friends, state.profiles, currentUserId]
+  )
+
+  const suggestions = useMemo(
+    () => state.profiles
+      .filter((p) => p.userId !== currentUserId && !myFriendIds.has(p.userId))
+      .slice(0, 3),
+    [state.profiles, currentUserId, myFriendIds]
+  )
+
+  const invite = () => toast("Invite link copied for the pilot demo.")
+
+  const sendRequest = async (friendId: string) => {
+    try {
+      await addFriend(friendId)
+      toast.success("Friend request sent.")
+    } catch {
+      toast.error("Could not send the request. Please try again.")
+    }
+  }
 
   return (
     <div className="min-h-full bg-background">
       <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
-                {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
-            </p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">Huddle</p>
             <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
-              Good to see you, {currentProfile.firstName}.
+              Hey, {currentProfile.firstName} 👋
             </h1>
           </div>
-          <Link
-            href="/app/profile"
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
-            style={{ backgroundColor: currentProfile.photoColor }}
-            aria-label="Open profile"
-          >
-            {currentProfile.displayName.charAt(0)}
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={invite}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white"
+              aria-label="Invite friends"
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+            <Link
+              href="/app/profile"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
+              style={{ backgroundColor: currentProfile.photoColor }}
+              aria-label="Open profile"
+            >
+              {currentProfile.displayName.charAt(0)}
+            </Link>
+          </div>
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-3xl bg-black/18 p-3">
-            <p className="font-heading text-2xl font-black text-white">{approvedActivities.length}</p>
-            <p className="text-[11px] text-white/62">joinable</p>
+            <p className="font-heading text-2xl font-black text-white">{attendingActivities.length}</p>
+            <p className="text-[11px] text-white/62">attending</p>
           </div>
           <div className="rounded-3xl bg-black/18 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.streakDays}</p>
@@ -79,136 +96,144 @@ export default function ActivityFeedPage() {
             <p className="text-[11px] text-white/62">points</p>
           </div>
         </div>
-
-        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-black/22 px-4 py-2">
-          <Search className="h-5 w-5 text-white/48" />
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search activities or locations"
-            className="min-h-11 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
-          />
-          <Bell className="h-5 w-5 text-white/48" />
-        </div>
       </header>
 
-      <section className="px-5 py-5">
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          <button
-            type="button"
-            onClick={() => setCategory("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-              category === "all" ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/62"
-            }`}
-          >
-            All
-          </button>
-          {categoryMeta.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setCategory(item.id)}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-                category === item.id ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/62"
-              }`}
-            >
-              {item.shortLabel}
-            </button>
-          ))}
-        </div>
+      <main className="px-5 py-5 space-y-5">
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-heading text-xl font-black text-white">Your huddles</h2>
+            <Link href="/app/community" className="text-xs font-bold text-secondary">
+              Browse all
+            </Link>
+          </div>
+          {attendingActivities.length === 0 ? (
+            <div className="glass-card rounded-[2rem] p-6 text-center">
+              <CalendarHeart className="mx-auto h-10 w-10 text-secondary" />
+              <h3 className="mt-4 font-heading text-lg font-bold text-white">No huddles yet</h3>
+              <p className="mt-2 text-sm leading-6 text-white/56">
+                Browse events and huddle up to something that interests you.
+              </p>
+              <Link
+                href="/app/community"
+                className="mt-5 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground"
+              >
+                Find events
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {attendingActivities.map((activity) => (
+                <ActivityCard key={activity.id} activity={activity} />
+              ))}
+            </div>
+          )}
+        </section>
 
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
-          <button
-            type="button"
-            onClick={() => setDate("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-              date === "all" ? "bg-white text-black" : "bg-white/8 text-white/62"
-            }`}
-          >
-            All dates
-          </button>
-          {Array.from(
-            new Set(
-              approvedActivities.map((a) =>
-                new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
+        <section>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="font-heading text-xl font-black text-white">Same wavelength</h2>
+            <span className="text-xs text-white/46">{leaderboard.length} students</span>
+          </div>
+          <div className="glass-card rounded-[2rem] overflow-hidden">
+            {leaderboard.slice(0, 5).map((profile, index) => {
+              const isMe = profile.userId === currentUserId
+              const isFriend = myFriendIds.has(profile.userId)
+              return (
+                <div
+                  key={profile.userId}
+                  className={`flex items-center justify-between px-4 py-3 border-b border-white/8 last:border-b-0 ${isMe ? "bg-secondary/10" : ""}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="w-5 text-xs font-bold text-white/40">#{index + 1}</span>
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                      style={{ backgroundColor: profile.photoColor }}
+                    >
+                      {profile.displayName.charAt(0)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">
+                        {isMe ? "You" : profile.displayName}
+                      </p>
+                      <p className="text-xs text-white/42">{profile.points} pts · {profile.meetupsThisWeek} meetups</p>
+                    </div>
+                  </div>
+                  {!isMe && !isFriend && (
+                    <button
+                      type="button"
+                      onClick={() => void sendRequest(profile.userId)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary/18 text-secondary"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
+                  )}
+                  {isFriend && (
+                    <span className="text-xs font-bold text-mint">Friend</span>
+                  )}
+                </div>
               )
-            )
-          )
-          .sort()
-          .map((d) => (
-            <button
-              key={d}
-              type="button"
-              onClick={() => setDate(d)}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-              date === d ? "bg-white text-black" : "bg-white/8 text-white/62"
-              }`}
-            >
-              {new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 flex items-center justify-between">
-        <div>
-          <h2 className="font-heading text-xl font-black text-white">Best matches</h2>
-            <p className="mt-1 text-xs text-white/46">
-              Sorted by interests, availability, and comfort.
-            </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setView("list")}
-            className={`flex h-9 w-9 items-center justify-center rounded-2xl ${view === "list" ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/60"}`}
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("map")}
-            className={`flex h-9 w-9 items-center justify-center rounded-2xl ${view === "map" ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/60"}`}
-          >
-            <MapIcon className="h-4 w-4" />
-          </button>
-          <Link href="/crisis" className="flex h-11 w-11 items-center justify-center rounded-full bg-coral/18 text-coral" aria-label="Safety resources">
-            <ShieldAlert className="h-5 w-5" />
-          </Link>
-        </div>
-        </div>
-
-        {view === "map" ? (
-          <div className="mt-4">
-            <EventsMap activities={filtered} />
+            })}
           </div>
-        ) : (
-          <div className="mt-4 space-y-4">
-            {filtered.map((activity) => (
-            <ActivityCard key={activity.id} activity={activity} />
-          ))}
-          </div>
+        </section>
+
+        {myFriends.length > 0 && (
+          <section>
+            <h2 className="font-heading text-xl font-black text-white mb-3">Your circle</h2>
+            <div className="space-y-3">
+              {myFriends.map(({ connection, profile }) => (
+                <div key={connection.id} className="glass-card flex items-center justify-between rounded-3xl p-4">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-black text-white"
+                      style={{ backgroundColor: profile!.photoColor }}
+                    >
+                      {profile!.displayName.charAt(0)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">{profile!.displayName}</p>
+                      <p className="text-xs text-white/42">
+                        {connection.status === "accepted" ? `${profile!.points} pts · ${profile!.meetupsThisWeek} meetups` : "Request pending"}
+                      </p>
+                    </div>
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-white/32" />
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
-        {filtered.length === 0 && (
-          <div className="glass-card mt-6 rounded-[2rem] p-6 text-center">
-            <h3 className="font-heading text-lg font-bold text-white">No matches for this filter</h3>
-            <p className="mt-2 text-sm leading-6 text-white/56">
-              Clear the filters to see everything happening on campus.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setCategory("all")
-                setDate("all")
-                setSearch("")
-              }}
-              className="mt-4 rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground"
-            >
-              Clear filters
-            </button>
-          </div>
+        {suggestions.length > 0 && (
+          <section>
+            <h2 className="font-heading text-xl font-black text-white mb-3">You might know</h2>
+            <div className="glass-card rounded-[2rem] overflow-hidden">
+              {suggestions.map((profile) => (
+                <div key={profile.userId} className="flex items-center justify-between border-b border-white/8 px-4 py-3 last:border-b-0">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                      style={{ backgroundColor: profile.photoColor }}
+                    >
+                      {profile.displayName.charAt(0)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">{profile.displayName}</p>
+                      <p className="text-xs text-white/42">{profile.meetupsThisWeek} meetups this week</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void sendRequest(profile.userId)}
+                    className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
+                  >
+                    Add
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
         )}
-      </section>
+      </main>
     </div>
   )
 }
