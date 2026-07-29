@@ -32,7 +32,7 @@ export function EventsMap({ activities }: { activities: ActivityView[] }) {
         <Map
           defaultCenter={UMD_CENTER}
           defaultZoom={15}
-          mapId="huddle-events-map"
+          mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID}
           gestureHandling="greedy"
           disableDefaultUI={false}
           style={{ width: "100%", height: "420px" }}
