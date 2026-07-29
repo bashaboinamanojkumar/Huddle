@@ -52,7 +52,7 @@ export default function CommunityPage() {
                 {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
             </p>
             <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
-              Good to see you, {currentProfile.firstName}.
+              All events
             </h1>
           </div>
           <Link
@@ -151,9 +151,9 @@ export default function CommunityPage() {
 
         <div className="mt-4 flex items-center justify-between">
         <div>
-          <h2 className="font-heading text-xl font-black text-white">Best matches</h2>
+          <h2 className="font-heading text-xl font-black text-white">Same wavelength</h2>
             <p className="mt-1 text-xs text-white/46">
-              Sorted by interests, availability, and comfort.
+              Sorted by shared interests, availability, and comfort.
             </p>
         </div>
         <div className="flex items-center gap-2">

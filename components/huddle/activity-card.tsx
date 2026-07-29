@@ -92,7 +92,7 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
 
         {activity.sharedInterests.length > 0 && (
           <p className="mt-4 rounded-2xl bg-secondary/12 px-3 py-2 text-xs font-medium text-secondary">
-            People who share your interests are going.
+            Same wavelength — people with your interests are going.
           </p>
         )}
       </Link>
