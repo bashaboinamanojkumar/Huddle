@@ -2,7 +2,6 @@
 
 import { EventsMap } from "@/components/huddle/events-map"
 import { List, Map as MapIcon } from "lucide-react"
-import { useTerplinkEvents } from "@/hooks/use-terplink-events"
 import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Bell, Search, ShieldAlert } from "lucide-react"
@@ -13,67 +12,36 @@ import { categoryMeta } from "@/lib/data/metadata"
 import type { Category } from "@/lib/types/huddle"
 
 export default function ActivityFeedPage() {
-  const { approvedActivities, currentProfile, currentUserId, state } = useHuddle()
+  const { approvedActivities, currentProfile, universityId } = useHuddle()
   const [category, setCategory] = useState<Category | "all">("all")
   const [date, setDate] = useState<string>("all")
   const [search, setSearch] = useState("")
   const [view, setView] = useState<"list" | "map">("list")
-  const { events: terplinkEvents } = useTerplinkEvents()
-  const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
 
-  const allActivities = useMemo(() => {
-  const systemHost = currentProfile
-  const terplinkViews = terplinkEvents
-  .filter((event) => new Date(event.startTime) > new Date() && event.universityId === userUniversityId)
-  .flatMap((event) => {
-    const location = state.locations.find((l) => l.id === event.locationId) ?? {
-      id: event.locationId,
-      universityId: "umd" as const,
-      name: event.locationId,
-      area: "UMD Campus",
-      safetyNote: "Please check TerpLink for exact location details.",
-    }
-    return [{
-      ...event,
-      location,
-      host: systemHost,
-      attendees: [],
-      goingCount: 0,
-      seatsLeft: event.capacity,
-      userRsvp: undefined,
-      fitScore: 50,
-      sharedInterests: [],
-    }]
-  })
-  const approvedIds = new Set(approvedActivities.map((a) => a.id))
-  const dedupedTerplink = terplinkViews.filter((a) => !approvedIds.has(a.id))
-  return [...approvedActivities, ...dedupedTerplink]
-  }, [approvedActivities, terplinkEvents, state.locations, state.profiles, userUniversityId, currentUserId])
-
-const filtered = useMemo(() => {
-  return allActivities
-    .filter((activity) => {
-      const matchesCategory = category === "all" || activity.category === category
-      const activityLocalDate = new Date(activity.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
-      const matchesBlock = date === "all" || activityLocalDate === date
-      const query = search.trim().toLowerCase()
-      const matchesSearch =
-        !query ||
-        activity.title.toLowerCase().includes(query) ||
-        activity.description.toLowerCase().includes(query) ||
-        activity.location.name.toLowerCase().includes(query)
-      return matchesCategory && matchesBlock && matchesSearch
-    })
-    .sort((a, b) => {
-      const aMatchesCategory = category === "all" || a.category === category
-      const bMatchesCategory = category === "all" || b.category === category
-      const aMatchesBlock = date === "all" || new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
-      const bMatchesBlock = date === "all" || new Date(b.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
-      const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
-      const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
-      return bScore - aScore
-    })
-}, [allActivities, date, category, search])
+  const filtered = useMemo(() => {
+    return approvedActivities
+      .filter((activity) => {
+        const matchesCategory = category === "all" || activity.category === category
+        const activityLocalDate = new Date(activity.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
+        const matchesBlock = date === "all" || activityLocalDate === date
+        const query = search.trim().toLowerCase()
+        const matchesSearch =
+          !query ||
+          activity.title.toLowerCase().includes(query) ||
+          activity.description.toLowerCase().includes(query) ||
+          activity.location.name.toLowerCase().includes(query)
+        return matchesCategory && matchesBlock && matchesSearch
+      })
+      .sort((a, b) => {
+        const aMatchesCategory = category === "all" || a.category === category
+        const bMatchesCategory = category === "all" || b.category === category
+        const aMatchesBlock = date === "all" || new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
+        const bMatchesBlock = date === "all" || new Date(b.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" }) === date
+        const aScore = (aMatchesCategory ? 2 : 0) + (aMatchesBlock ? 1 : 0)
+        const bScore = (bMatchesCategory ? 2 : 0) + (bMatchesBlock ? 1 : 0)
+        return bScore - aScore
+      })
+  }, [approvedActivities, date, category, search])
 
   return (
     <div className="min-h-full bg-background">
@@ -81,7 +49,7 @@ const filtered = useMemo(() => {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
-                {userUniversityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
+                {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
             </p>
             <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
               Good to see you, {currentProfile.firstName}.
@@ -99,7 +67,7 @@ const filtered = useMemo(() => {
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-3xl bg-black/18 p-3">
-            <p className="font-heading text-2xl font-black text-white">{allActivities.length}</p>
+            <p className="font-heading text-2xl font-black text-white">{approvedActivities.length}</p>
             <p className="text-[11px] text-white/62">joinable</p>
           </div>
           <div className="rounded-3xl bg-black/18 p-3">
@@ -160,7 +128,11 @@ const filtered = useMemo(() => {
             All dates
           </button>
           {Array.from(
-            new Set(allActivities.map((a) => new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })))
+            new Set(
+              approvedActivities.map((a) =>
+                new Date(a.startTime).toLocaleDateString("en-CA", { timeZone: "America/New_York" })
+              )
+            )
           )
           .sort()
           .map((d) => (
@@ -221,7 +193,7 @@ const filtered = useMemo(() => {
           <div className="glass-card mt-6 rounded-[2rem] p-6 text-center">
             <h3 className="font-heading text-lg font-bold text-white">No matches for this filter</h3>
             <p className="mt-2 text-sm leading-6 text-white/56">
-              Seeded activities are still available. Clear filters to see the launch board.
+              Clear the filters to see everything happening on campus.
             </p>
             <button
               type="button"

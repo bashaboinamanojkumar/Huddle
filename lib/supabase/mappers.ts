@@ -85,6 +85,7 @@ export function toHuddleActivity(row: ActivityRow): HuddleActivity {
     comfortSize: row.comfort_size,
     safetyPreference: row.safety_preference,
     createdAt: row.created_at,
+    externalUrl: row.external_url,
   }
 }
 

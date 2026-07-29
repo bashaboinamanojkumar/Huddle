@@ -88,7 +88,8 @@ export interface HuddleActivity {
   description: string
   category: Category
   locationId: string
-  hostId: string
+  /** Null for campus org listings, which Huddle surfaces but does not host. */
+  hostId: string | null
   capacity: number
   startTime: string
   availabilityBlock: AvailabilityBlock
@@ -99,6 +100,8 @@ export interface HuddleActivity {
   comfortSize: ComfortSize
   safetyPreference: SafetyPreference
   createdAt: string
+  /** Set on org listings so the card can link back to the source event page. */
+  externalUrl?: string | null
 }
 
 export interface HuddleRsvp {
@@ -183,7 +186,7 @@ export interface HuddleState {
 
 export interface ActivityView extends HuddleActivity {
   location: HuddleLocation
-  host: HuddleProfile
+  host: HuddleProfile | null
   attendees: ActivityAttendee[]
   goingCount: number
   seatsLeft: number

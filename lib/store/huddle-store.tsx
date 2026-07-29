@@ -34,6 +34,9 @@ import type {
 
 const ANONYMOUS_USER_ID = "anonymous"
 
+/** The pilot campus, used until a session tells us which school the viewer belongs to. */
+const DEFAULT_UNIVERSITY_ID: UniversityId = "umd"
+
 /**
  * The local session marker is presentation state that outlives the short-lived access
  * token. The Supabase cookie remains the actual security boundary.
@@ -110,6 +113,7 @@ interface HuddleContextValue {
   hydrated: boolean
   currentUserId: string
   currentProfile: HuddleProfile
+  universityId: UniversityId
   activities: ActivityView[]
   approvedActivities: ActivityView[]
   chatActivities: ActivityView[]
@@ -155,7 +159,9 @@ function buildActivityViews(state: HuddleState, currentUserId: string): Activity
     .map((activity) => {
       const location =
         state.locations.find((item) => item.id === activity.locationId) ?? state.locations[0]
-      const host = state.profiles.find((item) => item.userId === activity.hostId) ?? profile
+      // Org listings have no Huddle host, so this stays null rather than pretending
+      // someone owns the event.
+      const host = state.profiles.find((item) => item.userId === activity.hostId) ?? null
       const rsvps = state.rsvps.filter(
         (item) => item.activityId === activity.id && item.status === "going"
       )
@@ -305,13 +311,18 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     () => buildActivityViews(state, currentUserId),
     [state, currentUserId]
   )
+  const universityId = state.session
+    ? universityFor(state.session.email)
+    : DEFAULT_UNIVERSITY_ID
   const approvedActivities = useMemo(
     () =>
       activities.filter(
         (activity) =>
-          activity.status === "approved" && new Date(activity.startTime) > new Date()
+          activity.status === "approved" &&
+          activity.universityId === universityId &&
+          new Date(activity.startTime) > new Date()
       ),
-    [activities]
+    [activities, universityId]
   )
   const chatActivities = useMemo(
     () =>
@@ -473,6 +484,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       currentUserId,
       currentProfile,
+      universityId,
       activities,
       approvedActivities,
       chatActivities,
@@ -496,6 +508,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       hydrated,
       currentUserId,
       currentProfile,
+      universityId,
       activities,
       approvedActivities,
       chatActivities,
