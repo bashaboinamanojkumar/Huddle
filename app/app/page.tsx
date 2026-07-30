@@ -331,6 +331,23 @@ export default function FeedPage() {
             </div>
           </section>
         )}
+        {acceptedFriends.length === 0 && incomingRequests.length === 0 && suggestions.length === 0 && (
+          <section>
+            <div className="glass-card rounded-[2rem] p-6 text-center">
+              <UsersRound className="mx-auto h-10 w-10 text-secondary" />
+              <h3 className="mt-4 font-heading text-lg font-bold text-white">Build your circle</h3>
+              <p className="mt-2 text-sm leading-6 text-white/56">
+                Huddle up to events and connect with students on the same wavelength.
+              </p>
+              <Link
+                href="/app/community"
+                className="mt-5 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground"
+              >
+                Browse events
+              </Link>
+            </div>
+          </section>
+        )}
       </main>
     </div>
   )
