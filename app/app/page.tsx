@@ -17,8 +17,10 @@ export default function FeedPage() {
   )
 
   const leaderboard = useMemo(
-    () => [...state.profiles].sort((a, b) => b.meetupsThisWeek - a.meetupsThisWeek || b.points - a.points),
-    [state.profiles]
+    () => [...state.profiles]
+      .filter((p) => p.userId !== currentUserId)
+      .sort((a, b) => b.meetupsThisWeek - a.meetupsThisWeek || b.points - a.points),
+    [state.profiles, currentUserId]
   )
 
   const myFriendIds = useMemo(
@@ -171,9 +173,9 @@ export default function FeedPage() {
             <span className="text-xs text-white/46">{leaderboard.length} students</span>
           </div>
           <div className="glass-card rounded-[2rem] overflow-hidden">
-            {leaderboard.slice(0, 5).map((profile, index) => {
-              const isMe = profile.userId === currentUserId
-              const isFriend = myFriendIds.has(profile.userId)
+            {leaderboard.filter((p) => !myFriendIds.has(p.userId)).slice(0, 5).map((profile, index) => {
+              const isMe = false
+              const isFriend = false
               return (
                 <Link
                   key={profile.userId}
@@ -328,7 +330,7 @@ export default function FeedPage() {
             <div className="glass-card rounded-[2rem] overflow-hidden">
               {suggestions.map((profile) => (
                 <div key={profile.userId} className="flex items-center justify-between border-b border-white/8 px-4 py-3 last:border-b-0">
-                  <div className="flex items-center gap-3">
+                  <Link href={`/app/profile/${profile.userId}`} className="flex items-center gap-3 flex-1">
                     <span
                       className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
                       style={{ backgroundColor: profile.photoColor }}
@@ -339,7 +341,7 @@ export default function FeedPage() {
                       <p className="text-sm font-bold text-white">{profile.displayName}</p>
                       <p className="text-xs text-white/42">{profile.meetupsThisWeek} meetups this week</p>
                     </div>
-                  </div>
+                  </Link>
                   <button
                     type="button"
                     onClick={() => void sendRequest(profile.userId)}
