@@ -489,6 +489,8 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     [refresh]
   )
 
+
+  
   const declineFriend = useCallback(
     async (connectionId: string) => {
       const supabase = createClient()
