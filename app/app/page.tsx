@@ -22,7 +22,11 @@ export default function FeedPage() {
   )
 
   const myFriendIds = useMemo(
-    () => new Set(state.friends.filter((f) => f.userId === currentUserId && f.status === "accepted").map((f) => f.friendId)),
+    () => new Set(
+      state.friends
+        .filter((f) => f.status === "accepted" && (f.userId === currentUserId || f.friendId === currentUserId))
+        .map((f) => f.userId === currentUserId ? f.friendId : f.userId)
+    ),
     [state.friends, currentUserId]
   )
 
@@ -52,8 +56,11 @@ export default function FeedPage() {
 
   const acceptedFriends = useMemo(
     () => state.friends
-      .filter((f) => f.userId === currentUserId && f.status === "accepted")
-      .map((f) => ({ connection: f, profile: state.profiles.find((p) => p.userId === f.friendId) }))
+      .filter((f) => f.status === "accepted" && (f.userId === currentUserId || f.friendId === currentUserId))
+      .map((f) => {
+        const otherUserId = f.userId === currentUserId ? f.friendId : f.userId
+        return { connection: f, profile: state.profiles.find((p) => p.userId === otherUserId) }
+      })
       .filter((item) => item.profile),
     [state.friends, state.profiles, currentUserId]
   )
