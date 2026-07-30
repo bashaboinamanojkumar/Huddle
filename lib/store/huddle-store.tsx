@@ -137,6 +137,8 @@ interface HuddleContextValue {
     status: "approved" | "rejected"
   ) => Promise<void>
   addFriend: (friendId: string) => Promise<void>
+  acceptFriend: (connectionId: string) => Promise<void>
+  declineFriend: (connectionId: string) => Promise<void>
 }
 
 const HuddleContext = createContext<HuddleContextValue | undefined>(undefined)
@@ -478,6 +480,24 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     [requireUser]
   )
 
+  const acceptFriend = useCallback(
+    async (connectionId: string) => {
+      const supabase = createClient()
+      await mutations.acceptFriend(supabase, connectionId)
+      await refresh()
+    },
+    [refresh]
+  )
+
+  const declineFriend = useCallback(
+    async (connectionId: string) => {
+      const supabase = createClient()
+      await mutations.declineFriend(supabase, connectionId)
+      await refresh()
+    },
+    [refresh]
+  )
+
   const value = useMemo<HuddleContextValue>(
     () => ({
       state,
@@ -502,6 +522,8 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       resolveFlag,
       reviewActivity,
       addFriend,
+      acceptFriend,
+      declineFriend,
     }),
     [
       state,
@@ -526,6 +548,8 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       resolveFlag,
       reviewActivity,
       addFriend,
+      acceptFriend,
+      declineFriend,
     ]
   )
 

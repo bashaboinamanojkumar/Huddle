@@ -9,7 +9,7 @@ import { useHuddle } from "@/lib/store/huddle-store"
 import { formatActivityDate, formatActivityTime } from "@/lib/format"
 
 export default function FeedPage() {
-  const { approvedActivities, currentProfile, currentUserId, state, addFriend, refresh } = useHuddle()
+  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend, refresh } = useHuddle()
 
   const attendingActivities = useMemo(
     () => approvedActivities.filter((a) => a.userRsvp?.status === "going"),
@@ -229,21 +229,34 @@ export default function FeedPage() {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          await addFriend(connection.userId)
-                          await refresh()
-                          toast.success("Friend accepted!")
-                        } catch {
-                          toast.error("Could not accept request.")
-                        }
-                      }}
-                      className="rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"
-                    >
-                      Accept
-                    </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await acceptFriend(connection.id)
+                            toast.success("Friend accepted!")
+                          } catch {
+                            toast.error("Could not accept request.")
+                          }
+                        }}
+                        className="rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          try {
+                            await declineFriend(connection.id)
+                            toast("Request declined.")
+                          } catch {
+                            toast.error("Could not decline request.")
+                          }
+                        }}
+                        className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white/60"
+                      >
+                        Decline
+                      </button>
                   </div>
                 </div>
               ))}
@@ -331,7 +344,7 @@ export default function FeedPage() {
             </div>
           </section>
         )}
-        {acceptedFriends.length === 0 && incomingRequests.length === 0 && suggestions.length === 0 && (
+        {acceptedFriends.length === 0 && incomingRequests.length === 0 && outgoingRequests.length === 0 && suggestions.length === 0 && (
           <section>
             <div className="glass-card rounded-[2rem] p-6 text-center">
               <UsersRound className="mx-auto h-10 w-10 text-secondary" />

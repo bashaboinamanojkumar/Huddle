@@ -271,3 +271,27 @@ export async function addFriend(
   throwOnError(error, "Could not send the friend request")
   return data ? toFriendConnection(data) : null
 }
+
+export async function acceptFriend(
+  supabase: HuddleBrowserClient,
+  connectionId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("friend_connections")
+    .update({ status: "accepted" })
+    .eq("id", connectionId)
+
+  throwOnError(error, "Could not accept the friend request")
+}
+
+export async function declineFriend(
+  supabase: HuddleBrowserClient,
+  connectionId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from("friend_connections")
+    .delete()
+    .eq("id", connectionId)
+
+  throwOnError(error, "Could not decline the friend request")
+}
