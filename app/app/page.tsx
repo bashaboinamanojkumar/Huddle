@@ -175,8 +175,9 @@ export default function FeedPage() {
               const isMe = profile.userId === currentUserId
               const isFriend = myFriendIds.has(profile.userId)
               return (
-                <div
+                <Link
                   key={profile.userId}
+                  href={isMe ? "/app/profile" : `/app/profile/${profile.userId}`}
                   className={`flex items-center justify-between px-4 py-3 border-b border-white/8 last:border-b-0 ${isMe ? "bg-secondary/10" : ""}`}
                 >
                   <div className="flex items-center gap-3">
@@ -206,7 +207,7 @@ export default function FeedPage() {
                   {isFriend && (
                     <span className="text-xs font-bold text-mint">Friend</span>
                   )}
-                </div>
+                </Link>
               )
             })}
           </div>
@@ -276,7 +277,7 @@ export default function FeedPage() {
             <h2 className="font-heading text-xl font-black text-white mb-3">Your circle</h2>
             <div className="space-y-3">
               {acceptedFriends.map(({ connection, profile }) => (
-                <div key={connection.id} className="glass-card flex items-center justify-between rounded-3xl p-4">
+                <Link key={connection.id} href={`/app/profile/${profile!.userId}`} className="glass-card flex items-center justify-between rounded-3xl p-4 block">
                   <div className="flex items-center gap-3">
                     <span
                       className="flex h-11 w-11 items-center justify-center rounded-full text-sm font-black text-white"
@@ -290,7 +291,7 @@ export default function FeedPage() {
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-white/32" />
-                </div>
+                </Link>
               ))}
             </div>
           </section>
