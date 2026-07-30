@@ -9,7 +9,7 @@ import { useHuddle } from "@/lib/store/huddle-store"
 import { formatActivityDate, formatActivityTime } from "@/lib/format"
 
 export default function FeedPage() {
-  const { approvedActivities, currentProfile, currentUserId, state, addFriend } = useHuddle()
+  const { approvedActivities, currentProfile, currentUserId, state, addFriend, refresh } = useHuddle()
 
   const attendingActivities = useMemo(
     () => approvedActivities.filter((a) => a.userRsvp?.status === "going"),
@@ -22,7 +22,7 @@ export default function FeedPage() {
   )
 
   const myFriendIds = useMemo(
-    () => new Set(state.friends.filter((f) => f.userId === currentUserId).map((f) => f.friendId)),
+    () => new Set(state.friends.filter((f) => f.userId === currentUserId && f.status === "accepted").map((f) => f.friendId)),
     [state.friends, currentUserId]
   )
 
@@ -34,11 +34,40 @@ export default function FeedPage() {
     [state.friends, state.profiles, currentUserId]
   )
 
+  const incomingRequests = useMemo(
+    () => state.friends
+      .filter((f) => f.friendId === currentUserId && f.status === "pending")
+      .map((f) => ({ connection: f, profile: state.profiles.find((p) => p.userId === f.userId) }))
+      .filter((item) => item.profile),
+    [state.friends, state.profiles, currentUserId]
+  )
+
+  const outgoingRequests = useMemo(
+    () => state.friends
+      .filter((f) => f.userId === currentUserId && f.status === "pending")
+      .map((f) => ({ connection: f, profile: state.profiles.find((p) => p.userId === f.friendId) }))
+      .filter((item) => item.profile),
+    [state.friends, state.profiles, currentUserId]
+  )
+
+  const acceptedFriends = useMemo(
+    () => state.friends
+      .filter((f) => f.userId === currentUserId && f.status === "accepted")
+      .map((f) => ({ connection: f, profile: state.profiles.find((p) => p.userId === f.friendId) }))
+      .filter((item) => item.profile),
+    [state.friends, state.profiles, currentUserId]
+  )
+  
+  const pendingFriendIds = useMemo(
+    () => new Set(state.friends.filter((f) => f.userId === currentUserId && f.status === "pending").map((f) => f.friendId)),
+    [state.friends, currentUserId]
+  )
+
   const suggestions = useMemo(
     () => state.profiles
-      .filter((p) => p.userId !== currentUserId && !myFriendIds.has(p.userId))
+      .filter((p) => p.userId !== currentUserId && !myFriendIds.has(p.userId) && !pendingFriendIds.has(p.userId))
       .slice(0, 3),
-    [state.profiles, currentUserId, myFriendIds]
+    [state.profiles, currentUserId, myFriendIds, pendingFriendIds]
   )
 
   const invite = () => toast("Invite link copied for the pilot demo.")
@@ -176,11 +205,57 @@ export default function FeedPage() {
           </div>
         </section>
 
-        {myFriends.length > 0 && (
+      {incomingRequests.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-3">
+              <h2 className="font-heading text-xl font-black text-white">Friend requests</h2>
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-coral text-[10px] font-black text-white">
+                {incomingRequests.length}
+              </span>
+          </div>
+          <div className="glass-card rounded-[2rem] overflow-hidden">
+              {incomingRequests.map(({ connection, profile }) => (
+                <div key={connection.id} className="flex items-center justify-between border-b border-white/8 px-4 py-3 last:border-b-0">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                      style={{ backgroundColor: profile!.photoColor }}
+                    >
+                      {profile!.displayName.charAt(0)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">{profile!.displayName}</p>
+                      <p className="text-xs text-white/42">wants to connect</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          await addFriend(connection.userId)
+                          await refresh()
+                          toast.success("Friend accepted!")
+                        } catch {
+                          toast.error("Could not accept request.")
+                        }
+                      }}
+                      className="rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"
+                    >
+                      Accept
+                    </button>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </section>
+        )}
+
+        {acceptedFriends.length > 0 && (
           <section>
             <h2 className="font-heading text-xl font-black text-white mb-3">Your circle</h2>
             <div className="space-y-3">
-              {myFriends.map(({ connection, profile }) => (
+              {acceptedFriends.map(({ connection, profile }) => (
                 <div key={connection.id} className="glass-card flex items-center justify-between rounded-3xl p-4">
                   <div className="flex items-center gap-3">
                     <span
@@ -191,12 +266,35 @@ export default function FeedPage() {
                     </span>
                     <div>
                       <p className="text-sm font-bold text-white">{profile!.displayName}</p>
-                      <p className="text-xs text-white/42">
-                        {connection.status === "accepted" ? `${profile!.points} pts · ${profile!.meetupsThisWeek} meetups` : "Request pending"}
-                      </p>
+                      <p className="text-xs text-white/42">{profile!.points} pts · {profile!.meetupsThisWeek} meetups</p>
                     </div>
                   </div>
                   <ChevronRight className="h-5 w-5 text-white/32" />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {outgoingRequests.length > 0 && (
+          <section>
+            <h2 className="font-heading text-xl font-black text-white mb-3">Pending requests</h2>
+            <div className="glass-card rounded-[2rem] overflow-hidden">
+              {outgoingRequests.map(({ connection, profile }) => (
+                <div key={connection.id} className="flex items-center justify-between border-b border-white/8 px-4 py-3 last:border-b-0">
+                  <div className="flex items-center gap-3">
+                    <span
+                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                      style={{ backgroundColor: profile!.photoColor }}
+                    >
+                      {profile!.displayName.charAt(0)}
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-white">{profile!.displayName}</p>
+                      <p className="text-xs text-white/42">Request sent</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-bold text-white/40">Pending</span>
                 </div>
               ))}
             </div>
