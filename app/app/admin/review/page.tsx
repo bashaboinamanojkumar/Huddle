@@ -8,6 +8,12 @@ import { formatActivityDate, formatActivityTime } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
 import type { SafetyFlag } from "@/lib/types/huddle"
 
+
+const ADMIN_EMAILS = [
+  "rsingh06@umd.edu",
+  "manoj7@umd.edu",
+]
+
 const flagActions: { status: SafetyFlag["status"]; label: string }[] = [
   { status: "dismissed", label: "Dismiss" },
   { status: "warned", label: "Warn" },
@@ -17,6 +23,21 @@ const flagActions: { status: SafetyFlag["status"]; label: string }[] = [
 
 export default function ReviewQueuePage() {
   const { pendingActivities, state, resolveFlag, reviewActivity } = useHuddle()
+  const isAdmin = ADMIN_EMAILS.includes(state.session?.email ?? "")
+  if (!isAdmin) {
+    return (
+      <div className="flex min-h-full items-center justify-center px-5 text-center">
+        <div className="glass-card rounded-[2rem] p-6">
+          <ShieldCheck className="mx-auto h-10 w-10 text-coral" />
+          <h1 className="mt-4 font-heading text-xl font-bold text-white">Access restricted</h1>
+          <p className="mt-2 text-sm text-white/56">This area is only available to Huddle safety owners.</p>
+          <Link href="/app" className="mt-5 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    )
+  }
   const [busy, setBusy] = useState(false)
   const openFlags = state.flags.filter((flag) => flag.status === "open")
 
