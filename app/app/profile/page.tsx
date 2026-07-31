@@ -142,7 +142,7 @@ export default function ProfilePage() {
         <p className="mt-2 text-sm leading-6 text-white/62">
           Help us improve Huddle — tell us what's working and what's not.
         </p>
-        <a href="FEEDBACK_FORM_URL_HERE"
+        <a href="https://docs.google.com/forms/d/e/1FAIpQLSejhRu3mlvZC26VI6foPfZwjompSYqYFhndWq2PMBJ51JySeg/viewform?usp=header"
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-4 text-sm font-black text-secondary-foreground"
