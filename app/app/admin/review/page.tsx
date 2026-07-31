@@ -25,6 +25,8 @@ export default function ReviewQueuePage() {
   const { pendingActivities, state, resolveFlag, reviewActivity } = useHuddle()
   const isAdmin = ADMIN_EMAILS.includes(state.session?.email ?? "")
   if (!isAdmin) {
+    console.log("Session email:", state.session?.email)
+    console.log("Is admin:", isAdmin)
     return (
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
