@@ -118,9 +118,23 @@ export default function ChatThreadPage() {
         </div>
       </div>
 
-      {!chatOpen && (
-        <div className="mx-5 mt-4 rounded-3xl border border-white/10 bg-white/8 p-4 text-sm text-white/58">
-          Chat opens at two confirmed RSVPs.
+      {chatOpen && (
+        <div className="mx-5 mt-4 rounded-3xl border border-secondary/20 bg-secondary/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🌊</span>
+            <p className="text-sm font-semibold text-white">
+              Your huddle's locked in —{" "}
+              <span className="text-secondary font-black">{activity.goingCount} of {activity.capacity} confirmed</span>
+              {activity.goingCount < activity.capacity && (
+                <span className="text-white/60 font-normal"> · room for {activity.seatsLeft} more</span>
+              )}
+            </p>
+          </div>
+          {activity.goingCount < activity.capacity && (
+            <p className="mt-1 text-xs text-white/46 ml-7">
+              Share this huddle to fill the last {activity.seatsLeft === 1 ? "spot" : "spots"}!
+            </p>
+          )}
         </div>
       )}
 
