@@ -14,8 +14,6 @@ import { createClient } from "@/lib/supabase/client"
 export default function ProfilePage() {
   const router = useRouter()
   const { currentProfile, state, reportSafetyConcern, clearLocalSession } = useHuddle()
-  const ADMIN_EMAILS = ["rsingh06@umd.edu", "manoj7@umd.edu"]
-  const isAdmin = ADMIN_EMAILS.includes(state.session?.email ?? "")
   const [isSigningOut, setIsSigningOut] = useState(false)
   const [isReporting, setIsReporting] = useState(false)
   const email = state.session?.email
@@ -190,11 +188,9 @@ export default function ProfilePage() {
           <h2 className="font-heading text-lg font-bold text-white">Pilot controls</h2>
         </div>
         <div className="mt-4 grid gap-3">
-          {isAdmin && (
-            <Link href="/app/admin/review" className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold text-white">
-              Safety review queue
-            </Link>
-          )}
+          <Link href="/app/admin/review" className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-bold text-white">
+            Safety review queue
+          </Link>
           <button
             type="button"
             onClick={() => void signOut()}
