@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/credentials"
 import { createGoogleOAuthOptions } from "@/lib/auth/oauth"
 import {
+  formatCampusDomains,
   getAuthMessage,
   normalizeReturnPath,
   MIN_PASSWORD_LENGTH,
@@ -230,10 +231,9 @@ function CampusSignInPanel() {
         Verify your campus.
       </h1>
       <p className="mt-2 text-sm leading-6 text-white/62">
-        Only verified
-        <span className="font-semibold text-white"> @umd.edu</span> and
-        <span className="font-semibold text-white"> @umaryland.edu</span> accounts are
-        eligible.
+        Only verified{" "}
+        <span className="font-semibold text-white">{formatCampusDomains("and")}</span> accounts
+        are eligible.
       </p>
 
       {message && (

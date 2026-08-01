@@ -8,14 +8,20 @@ import {
 } from "@/lib/auth/credentials"
 
 describe("campus email entry", () => {
-  it("normalizes an eligible address", () => {
-    expect(validateCampusEmail("  Student@UMD.EDU ")).toEqual({
-      ok: true,
-      value: "student@umd.edu",
-    })
+  it.each([
+    ["  Student@UMD.EDU ", "student@umd.edu"],
+    ["  Terp@TerpMail.UMD.EDU ", "terp@terpmail.umd.edu"],
+  ])("normalizes an eligible address: %s", (email, expected) => {
+    expect(validateCampusEmail(email)).toEqual({ ok: true, value: expected })
   })
 
-  it.each(["student@gmail.com", "student@mail.umd.edu", "student", ""])(
+  it.each([
+    "student@gmail.com",
+    "student@mail.umd.edu",
+    "student@mail.terpmail.umd.edu",
+    "student",
+    "",
+  ])(
     "rejects an ineligible address: %s",
     (email) => {
       expect(validateCampusEmail(email)).toEqual({

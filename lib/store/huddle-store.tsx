@@ -149,6 +149,11 @@ function addDays(date: Date, days: number): string {
   return result.toISOString()
 }
 
+/**
+ * `umaryland.edu` is the Baltimore campus. Every other eligible domain — `umd.edu` and the
+ * `terpmail.umd.edu` student mail domain — is College Park, which is also how
+ * `handle_new_user` assigns `profiles.university_id` in the database.
+ */
 function universityFor(email: string): UniversityId {
   return email.endsWith("@umaryland.edu") ? "umb" : "umd"
 }

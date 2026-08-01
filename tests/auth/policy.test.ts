@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import {
   AUTH_ERROR_MESSAGES,
+  CAMPUS_DOMAINS,
+  formatCampusDomains,
   getAuthMessage,
   isAllowedProviderAccount,
   isEligibleCampusEmail,
@@ -11,6 +13,7 @@ import {
 describe("campus email policy", () => {
   it.each([
     [" Student@UMD.EDU ", "student@umd.edu"],
+    [" Terp@TerpMail.UMD.EDU ", "terp@terpmail.umd.edu"],
     ["researcher@umaryland.edu", "researcher@umaryland.edu"],
   ])("accepts and normalizes exact eligible domains", (input, expected) => {
     expect(normalizeCampusEmail(input)).toBe(expected)
@@ -27,9 +30,25 @@ describe("campus email policy", () => {
     "student@evilumd.edu",
     "student@umd.edu.evil.test",
     "student@umaryland.edu.evil.test",
+    // Listing one `umd.edu` subdomain must not admit the rest of them.
+    "student@mail.terpmail.umd.edu",
+    "student@evilterpmail.umd.edu",
+    "student@terpmail.umd.edu.evil.test",
   ])("rejects an ineligible or malformed address: %s", (input) => {
     expect(normalizeCampusEmail(input)).toBeNull()
     expect(isEligibleCampusEmail(input)).toBe(false)
+  })
+
+  it("names every eligible domain in campus-facing copy", () => {
+    const listed = formatCampusDomains("or")
+
+    CAMPUS_DOMAINS.forEach((domain) => {
+      expect(listed).toContain(`@${domain}`)
+    })
+    expect(listed).toBe("@umd.edu, @terpmail.umd.edu, or @umaryland.edu")
+    expect(formatCampusDomains("and")).toBe(
+      "@umd.edu, @terpmail.umd.edu, and @umaryland.edu"
+    )
   })
 })
 
@@ -75,7 +94,8 @@ describe("stable authentication errors", () => {
       campus_account_required: "Use an eligible UMD or University of Maryland campus account.",
       session_expired: "Your session expired. Sign in again to continue.",
       sign_in_required: "Sign in with your campus account to continue.",
-      invalid_campus_email: "Enter your @umd.edu or @umaryland.edu campus email address.",
+      invalid_campus_email:
+        "Enter your @umd.edu, @terpmail.umd.edu, or @umaryland.edu campus email address.",
       invalid_credentials: "That email and password combination is incorrect.",
       email_not_confirmed: "Confirm your campus email from the link we sent, then sign in.",
       weak_password: "Use a password of at least 8 characters.",

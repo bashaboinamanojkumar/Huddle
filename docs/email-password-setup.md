@@ -2,8 +2,12 @@
 
 Huddle accepts two ways to sign in: a campus Google account, and a campus email address with
 a password. Both are held to the same admission rules — a verified email whose exact domain is
-`umd.edu` or `umaryland.edu`. Everything else (phone, magic link, SSO, anonymous, other social
-providers) is still rejected and signed out.
+`umd.edu`, `terpmail.umd.edu`, or `umaryland.edu`. Everything else (phone, magic link, SSO,
+anonymous, other social providers) is still rejected and signed out.
+
+The eligible domains live in one place, `CAMPUS_DOMAINS` in `lib/auth/policy.ts`, and the
+sign-in copy and error messages are generated from that list. Matching is exact equality, so
+adding `terpmail.umd.edu` did not admit any other `umd.edu` subdomain.
 
 The application code is complete. The steps below are the Supabase dashboard configuration it
 depends on, and none of them can be committed to this repository.

@@ -1,6 +1,25 @@
-export const CAMPUS_DOMAINS = ["umd.edu", "umaryland.edu"] as const
+/**
+ * `terpmail.umd.edu` is College Park's student mail domain and is listed in its own right
+ * because matching is exact: every other `umd.edu` subdomain stays ineligible.
+ */
+export const CAMPUS_DOMAINS = ["umd.edu", "terpmail.umd.edu", "umaryland.edu"] as const
 
 export type CampusDomain = (typeof CAMPUS_DOMAINS)[number]
+
+/**
+ * Copy that has to name every eligible domain is built from `CAMPUS_DOMAINS`, so adding one
+ * cannot leave a screen or an error message advertising a stale set.
+ */
+export function formatCampusDomains(conjunction: "and" | "or"): string {
+  const suffixes = CAMPUS_DOMAINS.map((domain) => `@${domain}`)
+
+  if (suffixes.length < 3) {
+    return suffixes.join(` ${conjunction} `)
+  }
+
+  const last = suffixes[suffixes.length - 1]
+  return `${suffixes.slice(0, -1).join(", ")}, ${conjunction} ${last}`
+}
 
 /**
  * Supabase enforces its own minimum, so this has to be at least as strict as the value
@@ -38,7 +57,7 @@ export const AUTH_ERROR_MESSAGES: Record<AuthErrorCode, string> = {
   campus_account_required: "Use an eligible UMD or University of Maryland campus account.",
   session_expired: "Your session expired. Sign in again to continue.",
   sign_in_required: "Sign in with your campus account to continue.",
-  invalid_campus_email: "Enter your @umd.edu or @umaryland.edu campus email address.",
+  invalid_campus_email: `Enter your ${formatCampusDomains("or")} campus email address.`,
   invalid_credentials: "That email and password combination is incorrect.",
   email_not_confirmed: "Confirm your campus email from the link we sent, then sign in.",
   weak_password: `Use a password of at least ${MIN_PASSWORD_LENGTH} characters.`,
