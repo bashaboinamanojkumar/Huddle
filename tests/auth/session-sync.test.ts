@@ -112,10 +112,35 @@ describe("protected session synchronization", () => {
     ).toEqual({ kind: "reject", errorCode: "campus_account_required" })
   })
 
-  it("rejects an account that can also sign in with a password", () => {
+  it.each([
+    [
+      "a password account",
+      {
+        app_metadata: { provider: "email", providers: ["email"] },
+        identities: [{ provider: "email" }],
+      },
+    ],
+    [
+      "an account with Google and a password linked",
+      {
+        app_metadata: { provider: "google", providers: ["google", "email"] },
+        identities: [{ provider: "google" }, { provider: "email" }],
+      },
+    ],
+  ])("renders protected content for %s", (_label, overrides) => {
+    expect(
+      decideSessionSync({
+        lookup: authenticated(overrides),
+        localSession: localSession(),
+        now: NOW,
+      })
+    ).toEqual({ kind: "ready" })
+  })
+
+  it("rejects an account held by an unsupported provider", () => {
     const lookup = authenticated({
-      app_metadata: { provider: "google", providers: ["google", "email"] },
-      identities: [{ provider: "google" }, { provider: "email" }],
+      app_metadata: { provider: "phone", providers: ["phone"] },
+      identities: [{ provider: "phone" }],
     })
 
     expect(decideSessionSync({ lookup, localSession: localSession(), now: NOW })).toEqual({

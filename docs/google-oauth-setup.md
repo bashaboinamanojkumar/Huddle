@@ -4,6 +4,9 @@ Hurdle uses Supabase Auth's PKCE flow. Google redirects to Supabase first; Supab
 
 The application accepts only verified email addresses whose exact domain is `umd.edu` or `umaryland.edu`. Google hosted-domain hints are not authorization controls.
 
+Campus email and password is the second supported way in. This document covers Google; see
+[Email and Password Login Setup](./email-password-setup.md) for the rest.
+
 ## 1. Local environment
 
 Copy `.env.example` to `.env.local` and replace both values with the Project URL and publishable key from the Supabase project's **Connect** dialog:
@@ -38,7 +41,7 @@ In Google Cloud Console:
    ```
 
 5. Save the Google client ID and client secret in the Supabase Google provider settings, not in this repository or Vercel public variables.
-6. Keep Google as the only enabled sign-in provider for this pilot. Disable email/password, phone, magic-link/OTP, anonymous, SSO, and every other social provider in Supabase Auth. The application also verifies that the Google identity was the identity used for the current session, so merely linking Google to another login method is not sufficient.
+6. Keep Google and email/password as the only enabled sign-in providers. Disable phone, anonymous, SSO, and every other social provider in Supabase Auth. The application verifies that every identity on the account is one of those two, so linking any other login method still results in rejection. Email/password has its own configuration in [Email and Password Login Setup](./email-password-setup.md).
 
 See [Supabase Login with Google](https://supabase.com/docs/guides/auth/social-login/auth-google) for the current provider screens and callback format.
 
@@ -50,6 +53,7 @@ In **Supabase Dashboard > Authentication > URL Configuration**:
 2. Add these **Redirect URLs**:
    - `http://localhost:3000/auth/callback`
    - `https://myhuddle.vercel.app/auth/callback`
+   - `http://localhost:3000` and `https://myhuddle.vercel.app` — the bare origins that email confirmation and password recovery links are returned to
 3. Add a Vercel preview wildcard only if login must work on preview deployments. Keep the pattern restricted to this project rather than allowing arbitrary origins.
 
 The `redirectTo` URL passed by the browser must appear in this allow list. See [Supabase Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
@@ -66,9 +70,7 @@ Checked against the live project's public `/auth/v1/settings` and `/auth/v1/auth
 | Google Cloud redirect URI | Accepted — `/authorize` reaches the Google chooser with no `redirect_uri_mismatch` |
 | `prompt=select_account` | Forwarded through Supabase to Google |
 | Redirect URL allow list | **Not observable from outside** — see below |
-| Email/password provider | **Still enabled** — turn off under Authentication > Sign In / Providers |
-
-Email/password being enabled is not directly exploitable, because `proxy.ts` and the callback both require that Google was the identity used for the current sign-in, so an email user is signed out and rejected. Disable it anyway to remove the unused entry point.
+| Email/password provider | Enabled, and now a supported way in — configure it per [Email and Password Login Setup](./email-password-setup.md) |
 
 ### The allow list cannot be probed, only set
 

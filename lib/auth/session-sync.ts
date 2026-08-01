@@ -1,5 +1,5 @@
 import {
-  isGoogleOnlyAccount,
+  isAllowedProviderAccount,
   isEligibleCampusEmail,
   type AuthErrorCode,
 } from "@/lib/auth/policy"
@@ -40,7 +40,7 @@ export function isEligibleAuthUser(user: unknown): boolean {
     typeof candidate.email === "string" &&
     isEligibleCampusEmail(candidate.email) &&
     Boolean(candidate.email_confirmed_at) &&
-    isGoogleOnlyAccount(user)
+    isAllowedProviderAccount(user)
   )
 }
 
