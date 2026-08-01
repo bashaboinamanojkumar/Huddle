@@ -41,6 +41,7 @@ export function LocationMap({ locationId }: { locationId: string }) {
         <Map
           defaultCenter={coords}
           defaultZoom={16}
+          mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_ID}
           gestureHandling="cooperative"
           disableDefaultUI
           style={{ width: "100%", height: "200px" }}

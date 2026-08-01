@@ -59,7 +59,7 @@ export default function ChatsPage() {
           <MessageCircle className="mx-auto h-10 w-10 text-secondary" />
           <h2 className="mt-4 font-heading text-lg font-bold text-white">No open chats yet</h2>
           <p className="mt-2 text-sm leading-6 text-white/56">
-            RSVP to an activity. When a second student joins, the logistics chat opens automatically.
+            Huddle up to an activity. When a second student joins, the logistics chat opens automatically.
           </p>
           <Link href="/app" className="mt-5 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Find activities

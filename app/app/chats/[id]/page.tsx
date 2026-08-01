@@ -1,6 +1,7 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useRef } from "react"
+
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Flag, Lock, MapPin, Send, ShieldCheck } from "lucide-react"
@@ -20,6 +21,8 @@ export default function ChatThreadPage() {
   const { activities, state, currentUserId, sendMessage, reportSafetyConcern, leaveActivity } = useHuddle()
   const [body, setBody] = useState("")
   const [sending, setSending] = useState(false)
+  const [isTyping, setIsTyping] = useState(false)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const activity = activities.find((item) => item.id === params.id)
 
   const messages = useMemo(
@@ -115,9 +118,23 @@ export default function ChatThreadPage() {
         </div>
       </div>
 
-      {!chatOpen && (
-        <div className="mx-5 mt-4 rounded-3xl border border-white/10 bg-white/8 p-4 text-sm text-white/58">
-          Chat opens at two confirmed RSVPs.
+      {chatOpen && (
+        <div className="mx-5 mt-4 rounded-3xl border border-secondary/20 bg-secondary/10 px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🌊</span>
+            <p className="text-sm font-semibold text-white">
+              Your huddle's locked in —{" "}
+              <span className="text-secondary font-black">{activity.goingCount} of {activity.capacity} confirmed</span>
+              {activity.goingCount < activity.capacity && (
+                <span className="text-white/60 font-normal"> · room for {activity.seatsLeft} more</span>
+              )}
+            </p>
+          </div>
+          {activity.goingCount < activity.capacity && (
+            <p className="mt-1 text-xs text-white/46 ml-7">
+              Share this huddle to fill the last {activity.seatsLeft === 1 ? "spot" : "spots"}!
+            </p>
+          )}
         </div>
       )}
 
@@ -160,13 +177,36 @@ export default function ChatThreadPage() {
             </div>
           )
         })}
+        {isTyping && (
+          <div className="flex justify-end">
+            <div className="flex items-center gap-1.5 rounded-3xl bg-secondary/20 px-4 py-3">
+              <span className="h-2 w-2 rounded-full bg-secondary animate-bounce" style={{ animationDelay: "0ms" }} />
+              <span className="h-2 w-2 rounded-full bg-secondary animate-bounce" style={{ animationDelay: "150ms" }} />
+              <span className="h-2 w-2 rounded-full bg-secondary animate-bounce" style={{ animationDelay: "300ms" }} />
+            </div>
+          </div>
+        )}
+
+        {sending && (
+          <div className="flex justify-end">
+            <div className="flex items-center gap-2 rounded-3xl bg-white/8 px-4 py-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-secondary border-t-transparent" />
+                <p className="text-xs text-white/50">Sending...</p>
+            </div>
+          </div>
+        )}
       </div>
 
       <form onSubmit={submit} className="safe-pb border-t border-white/10 bg-black/70 px-4 pt-3 backdrop-blur-xl">
         <div className="flex items-center gap-2">
           <input
             value={body}
-            onChange={(event) => setBody(event.target.value)}
+            onChange={(event) => {
+              setBody(event.target.value)
+              setIsTyping(true)
+              if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+              typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 1500)
+            }}
             disabled={archived || !chatOpen}
             maxLength={2000}
             placeholder={archived ? "Archived chat" : "Message the group"}

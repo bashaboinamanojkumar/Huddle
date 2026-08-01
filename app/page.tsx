@@ -11,7 +11,7 @@ export default function LandingPage() {
           <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full bg-white/16 px-3 py-1 text-xs font-semibold text-white">
               <Sparkles className="h-3.5 w-3.5" />
-              UMD pilot for real-life meetups
+              University of Maryland pilot for real-life meetups
             </div>
             <h1 className="mt-8 font-heading text-5xl font-black leading-[0.95] tracking-tight text-white">
               Find your next small group.

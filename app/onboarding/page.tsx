@@ -279,7 +279,7 @@ export default function OnboardingPage() {
             disabled={!canContinue || saving}
             className="flex flex-[1.4] items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground disabled:opacity-45"
           >
-            {step === 5 ? (saving ? "Saving…" : "Enter Huddle") : "Continue"}
+            {step === 5 ? (saving ? "Saving…" : "Jump in") : "Continue"}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
