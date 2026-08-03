@@ -2,7 +2,12 @@
 
 Hurdle uses Supabase Auth's PKCE flow. Google redirects to Supabase first; Supabase then redirects the browser to Hurdle's `/auth/callback`, where the server exchanges the one-time code and stores the session in cookies.
 
-The application accepts only verified email addresses whose exact domain is `umd.edu` or `umaryland.edu`. Google hosted-domain hints are not authorization controls.
+The application accepts only verified email addresses whose exact domain is `umd.edu`, `terpmail.umd.edu`, or `umaryland.edu`. `terpmail.umd.edu` is named explicitly because the comparison is exact equality, not a suffix test: every other `umd.edu` subdomain, such as `dept.umd.edu` or `mail.umd.edu`, is still rejected. Google hosted-domain hints are not authorization controls.
+
+Adding `terpmail.umd.edu` needs no Google Cloud or Supabase change. It is a Google Workspace domain like the others, and the application never sends an `hd` hint, so the same OAuth client serves all three.
+
+Campus email and password is the second supported way in. This document covers Google; see
+[Email and Password Login Setup](./email-password-setup.md) for the rest.
 
 ## 1. Local environment
 
@@ -38,7 +43,7 @@ In Google Cloud Console:
    ```
 
 5. Save the Google client ID and client secret in the Supabase Google provider settings, not in this repository or Vercel public variables.
-6. Keep Google as the only enabled sign-in provider for this pilot. Disable email/password, phone, magic-link/OTP, anonymous, SSO, and every other social provider in Supabase Auth. The application also verifies that the Google identity was the identity used for the current session, so merely linking Google to another login method is not sufficient.
+6. Keep Google and email/password as the only enabled sign-in providers. Disable phone, anonymous, SSO, and every other social provider in Supabase Auth. The application verifies that every identity on the account is one of those two, so linking any other login method still results in rejection. Email/password has its own configuration in [Email and Password Login Setup](./email-password-setup.md).
 
 See [Supabase Login with Google](https://supabase.com/docs/guides/auth/social-login/auth-google) for the current provider screens and callback format.
 
@@ -50,6 +55,7 @@ In **Supabase Dashboard > Authentication > URL Configuration**:
 2. Add these **Redirect URLs**:
    - `http://localhost:3000/auth/callback`
    - `https://myhuddle.vercel.app/auth/callback`
+   - `http://localhost:3000` and `https://myhuddle.vercel.app` — the bare origins that email confirmation and password recovery links are returned to
 3. Add a Vercel preview wildcard only if login must work on preview deployments. Keep the pattern restricted to this project rather than allowing arbitrary origins.
 
 The `redirectTo` URL passed by the browser must appear in this allow list. See [Supabase Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls).
@@ -66,9 +72,7 @@ Checked against the live project's public `/auth/v1/settings` and `/auth/v1/auth
 | Google Cloud redirect URI | Accepted — `/authorize` reaches the Google chooser with no `redirect_uri_mismatch` |
 | `prompt=select_account` | Forwarded through Supabase to Google |
 | Redirect URL allow list | **Not observable from outside** — see below |
-| Email/password provider | **Still enabled** — turn off under Authentication > Sign In / Providers |
-
-Email/password being enabled is not directly exploitable, because `proxy.ts` and the callback both require that Google was the identity used for the current sign-in, so an email user is signed out and rejected. Disable it anyway to remove the unused entry point.
+| Email/password provider | Enabled, and now a supported way in — configure it per [Email and Password Login Setup](./email-password-setup.md) |
 
 ### The allow list cannot be probed, only set
 
@@ -136,9 +140,9 @@ Run this only in a protected server/operator environment. Never ship the `servic
 
 1. Visit `/app` in a signed-out private browser and confirm redirect to `/verify`.
 2. Select **Continue with Google** and confirm the Google account chooser appears.
-3. Complete login with an exact `umd.edu` or `umaryland.edu` account.
+3. Complete login with an exact `umd.edu`, `terpmail.umd.edu`, or `umaryland.edu` account.
 4. Confirm a new local profile goes to `/onboarding`; repeat after onboarding and confirm it returns to `/app`.
-5. Try a non-campus or campus-subdomain account and confirm it is signed out with the campus-account message.
+5. Try a non-campus account, or an ineligible campus subdomain such as `dept.umd.edu`, and confirm it is signed out with the campus-account message.
 6. Confirm a normal campus user cannot render `/app/admin/review`.
 7. Assign `safety_owner`, refresh the session by signing out and back in, and confirm the review route renders.
 8. Sign out from the profile page and confirm direct navigation back to `/app` requires Google login.

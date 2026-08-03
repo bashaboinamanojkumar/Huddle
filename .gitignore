@@ -7,12 +7,22 @@ __v0_jsx-dev-runtime.ts
 node_modules/
 .next/
 .DS_Store
+Thumbs.db
+desktop.ini
 .cursor/
+.vscode/
+.idea/
 Huddle_Build_Detailed.md.docx
 _docx_extracted.xml
 _plan.txt
 .pnpm-store/
-tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Tool output and crash logs, which land in the project root on a failed install or run.
+*.log
+coverage/
+.eslintcache
+.turbo/
 
 # Vercel CLI
 .vercel

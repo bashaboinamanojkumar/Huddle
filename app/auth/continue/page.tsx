@@ -6,7 +6,7 @@ import { ShieldCheck, WifiOff } from "lucide-react"
 import {
   normalizeCampusEmail,
   normalizeReturnPath,
-  isGoogleOnlyAccount,
+  isAllowedProviderAccount,
   type AuthErrorCode,
 } from "@/lib/auth/policy"
 import { useHuddle } from "@/lib/store/huddle-store"
@@ -62,7 +62,7 @@ function ContinueSession() {
         }
 
         const email = normalizeCampusEmail(user.email)
-        if (!email || !isGoogleOnlyAccount(user)) {
+        if (!email || !isAllowedProviderAccount(user)) {
           await supabase.auth.signOut()
           reject("campus_account_required")
           return

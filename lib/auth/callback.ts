@@ -1,6 +1,6 @@
 import {
   type AuthErrorCode,
-  isGoogleOnlyAccount,
+  isAllowedProviderAccount,
   normalizeCampusEmail,
   normalizeReturnPath,
 } from "@/lib/auth/policy"
@@ -15,13 +15,16 @@ export interface CallbackUser {
   }>
 }
 
-export interface CallbackAuth {
-  exchangeCodeForSession: (code: string) => Promise<{ error: unknown | null }>
+export interface EligibilityAuth {
   getUser: () => Promise<{
     data: { user: CallbackUser | null }
     error: unknown | null
   }>
   signOut: () => Promise<{ error: unknown | null }>
+}
+
+export interface CallbackAuth extends EligibilityAuth {
+  exchangeCodeForSession: (code: string) => Promise<{ error: unknown | null }>
 }
 
 export interface AuthCallbackResult {
@@ -74,14 +77,14 @@ export function summarizeCallbackUser(user: unknown): string {
     `email_present=${Boolean(candidate.email)}`,
     `email_confirmed=${Boolean(candidate.email_confirmed_at)}`,
     `eligible_domain=${Boolean(candidate.email && normalizeCampusEmail(candidate.email))}`,
-    `app_provider_google=${appMetadata.provider === "google"}`,
+    `primary_provider=${typeof appMetadata.provider === "string" ? appMetadata.provider : "unknown"}`,
     `linked_providers=${linkedProviders}`,
     `identity_providers=${identities.map((identity) => identity.provider ?? "unknown").join("+") || "none"}`,
-    `google_only_account=${isGoogleOnlyAccount(candidate)}`,
+    `allowed_provider_account=${isAllowedProviderAccount(candidate)}`,
   ].join(" ")
 }
 
-function verifyDestination(code: AuthErrorCode, next: string): AuthCallbackResult {
+export function verifyDestination(code: AuthErrorCode, next: string): AuthCallbackResult {
   const search = new URLSearchParams({ error: code, next })
   return {
     destination: `/verify?${search.toString()}`,
@@ -89,12 +92,53 @@ function verifyDestination(code: AuthErrorCode, next: string): AuthCallbackResul
   }
 }
 
-async function safeSignOut(auth: CallbackAuth): Promise<void> {
+async function safeSignOut(auth: EligibilityAuth): Promise<void> {
   try {
     await auth.signOut()
   } catch {
     // The identity is still rejected even if the provider cannot revoke locally.
   }
+}
+
+export type EligibleUserResult =
+  | { ok: true; user: CallbackUser }
+  | { ok: false; errorCode: AuthErrorCode }
+
+/**
+ * Every path that establishes a session — OAuth exchange, signup confirmation, password
+ * recovery — has to apply the same admission rules, so they share this one implementation
+ * rather than each repeating the checks.
+ */
+export async function resolveEligibleUser(
+  auth: EligibilityAuth,
+  lookupErrorCode: AuthErrorCode
+): Promise<EligibleUserResult> {
+  let user: CallbackUser | null
+  try {
+    const result = await auth.getUser()
+    if (result.error) {
+      return { ok: false, errorCode: lookupErrorCode }
+    }
+    user = result.data.user
+  } catch {
+    return { ok: false, errorCode: lookupErrorCode }
+  }
+
+  if (!user) {
+    return { ok: false, errorCode: lookupErrorCode }
+  }
+
+  if (!user.email || !user.email_confirmed_at) {
+    await safeSignOut(auth)
+    return { ok: false, errorCode: "missing_email" }
+  }
+
+  if (!isAllowedProviderAccount(user) || !normalizeCampusEmail(user.email)) {
+    await safeSignOut(auth)
+    return { ok: false, errorCode: "campus_account_required" }
+  }
+
+  return { ok: true, user }
 }
 
 export async function processAuthCallback(
@@ -118,34 +162,18 @@ export async function processAuthCallback(
     return verifyDestination("invalid_callback", next)
   }
 
-  let user: CallbackUser | null
   try {
     const exchange = await auth.exchangeCodeForSession(code)
     if (exchange.error) {
       return verifyDestination("invalid_callback", next)
     }
-
-    const result = await auth.getUser()
-    if (result.error) {
-      return verifyDestination("invalid_callback", next)
-    }
-    user = result.data.user
   } catch {
     return verifyDestination("invalid_callback", next)
   }
 
-  if (!user) {
-    return verifyDestination("invalid_callback", next)
-  }
-
-  if (!user.email || !user.email_confirmed_at) {
-    await safeSignOut(auth)
-    return verifyDestination("missing_email", next)
-  }
-
-  if (!isGoogleOnlyAccount(user) || !normalizeCampusEmail(user.email)) {
-    await safeSignOut(auth)
-    return verifyDestination("campus_account_required", next)
+  const eligible = await resolveEligibleUser(auth, "invalid_callback")
+  if (!eligible.ok) {
+    return verifyDestination(eligible.errorCode, next)
   }
 
   const search = new URLSearchParams({ next })

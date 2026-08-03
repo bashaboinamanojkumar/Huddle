@@ -1,4 +1,4 @@
-export type CampusDomain = "umd.edu" | "umaryland.edu"
+export type { CampusDomain } from "@/lib/auth/policy"
 
 export type UniversityId = "umd" | "umb"
 

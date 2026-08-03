@@ -1,6 +1,6 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
-import { isGoogleOnlyAccount, isEligibleCampusEmail } from "@/lib/auth/policy"
+import { isAllowedProviderAccount, isEligibleCampusEmail } from "@/lib/auth/policy"
 import { decideAuthRoute, type AuthState } from "@/lib/auth/routing"
 import { hasSupabaseSessionCookie } from "@/lib/auth/session-cookies"
 
@@ -68,7 +68,7 @@ export async function updateSession(request: NextRequest): Promise<NextResponse>
       authState =
         Boolean(user.email_confirmed_at) &&
         Boolean(user.email && isEligibleCampusEmail(user.email)) &&
-        isGoogleOnlyAccount(user)
+        isAllowedProviderAccount(user)
           ? "eligible"
           : "ineligible"
     }

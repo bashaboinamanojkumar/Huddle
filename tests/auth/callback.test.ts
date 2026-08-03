@@ -73,7 +73,7 @@ describe("OAuth callback", () => {
         identities: [{ provider: "google" }, { provider: "email" }],
       })
     ).toBe(
-      "email_present=true email_confirmed=true eligible_domain=true app_provider_google=true linked_providers=google+email identity_providers=google+email google_only_account=false"
+      "email_present=true email_confirmed=true eligible_domain=true primary_provider=google linked_providers=google+email identity_providers=google+email allowed_provider_account=true"
     )
   })
 
@@ -197,7 +197,7 @@ describe("OAuth callback", () => {
     })
   })
 
-  it("signs out a campus session that was not authenticated by Google", async () => {
+  it("signs out a campus session held by an unsupported provider", async () => {
     const auth = createAuth({
       getUser: vi.fn().mockResolvedValue({
         data: {
@@ -205,8 +205,8 @@ describe("OAuth callback", () => {
             id: "user-123",
             email: "student@umd.edu",
             email_confirmed_at: "2026-07-25T12:00:00.000Z",
-            app_metadata: { provider: "email", providers: ["email"] },
-            identities: [{ provider: "email" }],
+            app_metadata: { provider: "phone", providers: ["phone"] },
+            identities: [{ provider: "phone" }],
           },
         },
         error: null,
@@ -222,7 +222,7 @@ describe("OAuth callback", () => {
     expect(result.errorCode).toBe("campus_account_required")
   })
 
-  it("rejects an email sign-in when the same user also has Google linked", async () => {
+  it("continues a campus account that has both Google and a password linked", async () => {
     const auth = createAuth({
       getUser: vi.fn().mockResolvedValue({
         data: {
@@ -243,7 +243,10 @@ describe("OAuth callback", () => {
       auth
     )
 
-    expect(auth.signOut).toHaveBeenCalledOnce()
-    expect(result.errorCode).toBe("campus_account_required")
+    expect(auth.signOut).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      destination: "/auth/continue?next=%2Fapp",
+      errorCode: null,
+    })
   })
 })
