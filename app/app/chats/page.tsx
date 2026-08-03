@@ -56,7 +56,7 @@ export default function ChatsPage() {
 
       {chatActivities.length === 0 && (
         <div className="glass-card mt-8 rounded-[2rem] p-6 text-center">
-          <MessageCircle className="mx-auto h-10 w-10 text-secondary" />
+          <img src="/ollie.png" alt="Ollie the otter" className="mx-auto h-24 w-24 object-contain" />
           <h2 className="mt-4 font-heading text-lg font-bold text-white">No open chats yet</h2>
           <p className="mt-2 text-sm leading-6 text-white/56">
             Huddle up to an activity. When a second student joins, the logistics chat opens automatically.
