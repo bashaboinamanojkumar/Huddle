@@ -41,17 +41,22 @@ immutable
 security definer
 set search_path = ''
 as $$
+  with parsed_path as (
+    select pg_catalog.regexp_replace(p_path, '[?#].*$', '') as pathname
+  )
   select
     p_path is not null
     and pg_catalog.char_length(p_path) between 4 and 2048
-    and p_path ~ '^/app($|[/?#])'
-    and p_path !~ '//'
+    and parsed_path.pathname ~ '^/app($|/)'
+    and parsed_path.pathname !~ '//'
     and p_path !~ '[[:cntrl:][:space:]]'
     and pg_catalog.strpos(p_path, pg_catalog.chr(92)) = 0
-    and pg_catalog.lower(p_path) !~ '%25'
-    and pg_catalog.lower(p_path) !~ '%([01][0-9a-f]|7f|2f|5c)'
-    and pg_catalog.lower(p_path)
-      !~ '(^|/)([.]|%2e)([.]|%2e)($|/|%2f|[?#])';
+    and pg_catalog.lower(parsed_path.pathname) !~ '%25'
+    and pg_catalog.lower(parsed_path.pathname)
+      !~ '%([01][0-9a-f]|7f|2f|5c)'
+    and pg_catalog.lower(parsed_path.pathname)
+      !~ '(^|/)([.]|%2e)([.]|%2e)($|/|%2f)'
+  from parsed_path;
 $$;
 
 create or replace function public.create_notification(
