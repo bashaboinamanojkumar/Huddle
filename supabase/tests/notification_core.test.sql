@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth;
 
-select plan(24);
+select no_plan();
 
 select has_table('public', 'notifications', 'public.notifications exists');
 select has_table(
@@ -167,7 +167,33 @@ values (
 );
 
 insert into public.notification_preferences (user_id)
-values ('10000000-0000-4000-8000-000000000001');
+values ('10000000-0000-4000-8000-000000000001')
+on conflict (user_id) do nothing;
+
+insert into public.notification_preferences (user_id)
+values ('20000000-0000-4000-8000-000000000001')
+on conflict (user_id) do nothing;
+
+insert into public.notifications (
+  id,
+  user_id,
+  type,
+  category,
+  title,
+  body,
+  url,
+  dedupe_key
+)
+values (
+  '20000000-0000-4000-8000-000000000002',
+  '20000000-0000-4000-8000-000000000001',
+  'friend_request',
+  'social',
+  'New friend request',
+  'Another student sent you a friend request.',
+  '/app/friends',
+  'fixture:social:other-owner'
+);
 
 insert into public.push_subscriptions (
   id,
@@ -393,6 +419,1307 @@ select results_eq(
   $$,
   $$values (true, true)$$,
   'notifications use full replica identity and are published to Realtime'
+);
+
+-- Access control is verified with the same role and JWT claims PostgREST uses.
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$select id from public.notifications order by id$$,
+  $$values ('10000000-0000-4000-8000-000000000002'::uuid)$$,
+  'authenticated owners can select only their own notifications'
+);
+
+select results_eq(
+  $$select user_id from public.notification_preferences order by user_id$$,
+  $$values ('10000000-0000-4000-8000-000000000001'::uuid)$$,
+  'authenticated owners can select only their own notification preferences'
+);
+
+select results_eq(
+  $$select id from public.push_subscriptions order by id$$,
+  $$values ('10000000-0000-4000-8000-000000000003'::uuid)$$,
+  'authenticated owners can select only their own push subscriptions'
+);
+
+select results_eq(
+  $$select id from public.notification_runtime_config$$,
+  $$values (true)$$,
+  'authenticated clients can read the singleton notification runtime config'
+);
+
+select throws_like(
+  $$
+    insert into public.notifications (
+      user_id, type, category, title, body, url, dedupe_key
+    ) values (
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'chat',
+      'Forbidden insert',
+      'Clients cannot create notification content.',
+      '/app',
+      'fixture:forbidden:insert'
+    )
+  $$,
+  '%permission denied for table notifications%',
+  'authenticated clients cannot directly insert notifications'
+);
+
+select throws_like(
+  $$
+    update public.notifications
+    set body = 'Forbidden content update'
+    where id = '10000000-0000-4000-8000-000000000002'
+  $$,
+  '%permission denied for table notifications%',
+  'authenticated clients cannot directly update notification content'
+);
+
+select throws_like(
+  $$
+    update public.notifications
+    set read_at = now()
+    where id = '10000000-0000-4000-8000-000000000002'
+  $$,
+  '%permission denied for table notifications%',
+  'authenticated clients cannot directly update notification read state'
+);
+
+select throws_like(
+  $$
+    insert into public.notification_deliveries (
+      notification_id, subscription_id, user_id
+    ) values (
+      (
+        select id
+        from public.notifications
+        where user_id = '10000000-0000-4000-8000-000000000001'
+          and dedupe_key = 'fixture:forbidden:insert'
+      ),
+      '10000000-0000-4000-8000-000000000003',
+      '10000000-0000-4000-8000-000000000001'
+    )
+  $$,
+  '%permission denied for table notification_deliveries%',
+  'authenticated clients cannot directly insert notification deliveries'
+);
+
+select throws_like(
+  $$
+    update public.notification_deliveries
+    set state = 'sent'
+    where id = '10000000-0000-4000-8000-000000000004'
+  $$,
+  '%permission denied for table notification_deliveries%',
+  'authenticated clients cannot directly update notification deliveries'
+);
+
+select throws_like(
+  $$
+    update public.notification_runtime_config
+    set push_enabled = false
+    where id
+  $$,
+  '%permission denied for table notification_runtime_config%',
+  'authenticated clients cannot mutate notification runtime config'
+);
+
+reset role;
+
+select ok(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.mark_notification_read(uuid)'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  'authenticated can execute mark_notification_read'
+);
+
+select ok(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.mark_all_notifications_read()'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  'authenticated can execute mark_all_notifications_read'
+);
+
+select ok(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.update_notification_preferences(boolean,boolean,boolean,boolean,boolean,boolean,boolean,boolean,time without time zone,time without time zone,text,integer)'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  'authenticated can execute update_notification_preferences'
+);
+
+select ok(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.save_push_subscription(text,text,text,text)'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  'authenticated can execute save_push_subscription'
+);
+
+select ok(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.disable_push_subscription(text)'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  'authenticated can execute disable_push_subscription'
+);
+
+select is(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'anon',
+      pg_catalog.to_regprocedure('public.mark_notification_read(uuid)'),
+      'execute'
+    ),
+    false
+  ),
+  false,
+  'anon cannot execute notification owner RPCs'
+);
+
+select is(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.create_notification(uuid,public.notification_type,text,text,text,jsonb,text,timestamp with time zone,boolean)'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  false,
+  'authenticated cannot execute create_notification'
+);
+
+select is(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure(
+        'public.notification_category_for_type(public.notification_type)'
+      ),
+      'execute'
+    ),
+    false
+  ),
+  false,
+  'authenticated cannot execute notification category helpers'
+);
+
+select is(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure('public.is_safe_notification_path(text)'),
+      'execute'
+    ),
+    false
+  ),
+  false,
+  'authenticated cannot execute notification path helpers'
+);
+
+select is(
+  pg_catalog.has_function_privilege(
+    'authenticated',
+    'public.handle_new_user()'::regprocedure,
+    'execute'
+  ),
+  false,
+  'authenticated cannot execute the signup trigger function'
+);
+
+select is(
+  pg_catalog.has_function_privilege(
+    'anon',
+    'public.ensure_profile()'::regprocedure,
+    'execute'
+  ),
+  false,
+  'anon cannot execute ensure_profile'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from pg_catalog.pg_proc as proc
+    join pg_catalog.pg_namespace as namespace
+      on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'public'
+      and proc.proname in (
+        'create_notification',
+        'mark_notification_read',
+        'mark_all_notifications_read',
+        'update_notification_preferences',
+        'save_push_subscription',
+        'disable_push_subscription',
+        'handle_new_user',
+        'ensure_profile'
+      )
+      and proc.prosecdef
+      and not coalesce(proc.proconfig, '{}'::text[]) @> array['search_path=""']
+  $$,
+  $$values (0)$$,
+  'all notification security-definer functions fix an empty search_path'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from pg_catalog.pg_proc as proc
+    join pg_catalog.pg_namespace as namespace
+      on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'public'
+      and proc.proname in (
+        'mark_notification_read',
+        'mark_all_notifications_read',
+        'update_notification_preferences',
+        'save_push_subscription',
+        'disable_push_subscription',
+        'ensure_profile'
+      )
+      and pg_catalog.pg_get_functiondef(proc.oid) !~ 'auth[.]uid[(][)]'
+  $$,
+  $$values (0)$$,
+  'authenticated security-definer RPCs explicitly authorize auth.uid()'
+);
+
+delete from public.notification_preferences
+where user_id = '10000000-0000-4000-8000-000000000001';
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select lives_ok(
+  $$select public.ensure_profile()$$,
+  'ensure_profile repairs an existing authenticated profile'
+);
+
+select results_eq(
+  $$
+    select user_id
+    from public.notification_preferences
+    where user_id = '10000000-0000-4000-8000-000000000001'
+  $$,
+  $$values ('10000000-0000-4000-8000-000000000001'::uuid)$$,
+  'ensure_profile provisions missing notification preferences'
+);
+
+reset role;
+
+select matches(
+  pg_catalog.pg_get_functiondef('public.handle_new_user()'::regprocedure),
+  'insert into public[.]notification_preferences',
+  'handle_new_user provisions notification preferences for new users'
+);
+
+select results_eq(
+  $$
+    select notification_type::text, public.notification_category_for_type(notification_type)::text
+    from unnest(enum_range(null::public.notification_type)) as notification_type
+    order by notification_type::text
+  $$,
+  $$
+    values
+      ('activity_approved', 'activities'),
+      ('activity_joined', 'activities'),
+      ('activity_match_digest', 'digest'),
+      ('activity_rejected', 'activities'),
+      ('badge_unlocked', 'rewards'),
+      ('chat_message', 'chat'),
+      ('chat_opened', 'chat'),
+      ('event_reminder_1h', 'reminders'),
+      ('event_reminder_24h', 'reminders'),
+      ('friend_accepted', 'social'),
+      ('friend_request', 'social'),
+      ('friend_rsvp', 'social'),
+      ('leaderboard_placement', 'rewards'),
+      ('points_milestone', 'rewards'),
+      ('pulse_prompt', 'reminders'),
+      ('safety_report_status', 'safety'),
+      ('safety_review', 'safety'),
+      ('streak_at_risk', 'rewards'),
+      ('waitlist_promoted', 'activities'),
+      ('weekly_recap', 'digest')
+  $$,
+  'every approved notification type maps to its server-derived category'
+);
+
+select results_eq(
+  $$
+    select candidate, public.is_safe_notification_path(candidate)
+    from (
+      values
+        ('/app'::text),
+        ('/app/activities'::text),
+        ('/app?tab=inbox'::text),
+        ('/app#notifications'::text),
+        ('/app/../admin'::text),
+        ('/app/%2e%2e/admin'::text),
+        ('//evil.example/path'::text),
+        ('https://evil.example/app'::text),
+        (E'/app\\evil'::text),
+        (''::text),
+        (E'/app/line\nbreak'::text)
+    ) as paths(candidate)
+  $$,
+  $$
+    values
+      ('/app'::text, true),
+      ('/app/activities'::text, true),
+      ('/app?tab=inbox'::text, true),
+      ('/app#notifications'::text, true),
+      ('/app/../admin'::text, false),
+      ('/app/%2e%2e/admin'::text, false),
+      ('//evil.example/path'::text, false),
+      ('https://evil.example/app'::text, false),
+      (E'/app\\evil'::text, false),
+      (''::text, false),
+      (E'/app/line\nbreak'::text, false)
+  $$,
+  'notification paths accept app-local forms and reject redirects or unsafe characters'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '30000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Missing recipient',
+      'No profile owns this notification.',
+      '/app',
+      '{}'::jsonb,
+      'fixture:missing-recipient'
+    )
+  $$,
+  '22023'::char(5),
+  'Notification recipient does not exist',
+  'create_notification rejects recipients without a profile'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      ' ',
+      'Valid body',
+      '/app',
+      '{}'::jsonb,
+      'fixture:empty-title'
+    )
+  $$,
+  '22023'::char(5),
+  'Notification title is required',
+  'create_notification rejects an empty title'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      repeat('t', 121),
+      'Valid body',
+      '/app',
+      '{}'::jsonb,
+      'fixture:long-title'
+    )
+  $$,
+  '22023'::char(5),
+  'Notification title exceeds 120 characters',
+  'create_notification rejects an over-limit title'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Valid title',
+      ' ',
+      '/app',
+      '{}'::jsonb,
+      'fixture:empty-body'
+    )
+  $$,
+  '22023'::char(5),
+  'Notification body is required',
+  'create_notification rejects an empty body'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Valid title',
+      repeat('b', 1001),
+      '/app',
+      '{}'::jsonb,
+      'fixture:long-body'
+    )
+  $$,
+  '22023'::char(5),
+  'Notification body exceeds 1000 characters',
+  'create_notification rejects an over-limit body'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Valid title',
+      'Valid body',
+      '/app',
+      '{}'::jsonb,
+      ' '
+    )
+  $$,
+  '22023'::char(5),
+  'Notification dedupe key is required',
+  'create_notification rejects an empty dedupe key'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Valid title',
+      'Valid body',
+      '/app',
+      '{}'::jsonb,
+      repeat('k', 256)
+    )
+  $$,
+  '22023'::char(5),
+  'Notification dedupe key exceeds 255 characters',
+  'create_notification rejects an over-limit dedupe key'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Unsafe path',
+      'Absolute redirect paths are forbidden.',
+      '//evil.example/path',
+      '{}'::jsonb,
+      'fixture:unsafe-path'
+    )
+  $$,
+  '22023'::char(5),
+  'Unsafe notification path',
+  'create_notification rejects unsafe notification paths'
+);
+
+select throws_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Invalid data',
+      'Array payloads are forbidden.',
+      '/app',
+      '[]'::jsonb,
+      'fixture:invalid-data'
+    )
+  $$,
+  '22023'::char(5),
+  'Notification data must be a JSON object',
+  'create_notification rejects non-object data'
+);
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'friend_request',
+      'Friend request',
+      'A student would like to connect.',
+      '/app/friends?tab=requests#pending',
+      '{"request_id":"40000000-0000-4000-8000-000000000001"}'::jsonb,
+      'fixture:create:derived-category',
+      '2026-08-01 12:00:00+00'::timestamptz,
+      false
+    )
+  $$,
+  'create_notification accepts valid notification content'
+);
+
+select results_eq(
+  $$
+    select category::text
+    from public.notifications
+    where user_id = '10000000-0000-4000-8000-000000000001'
+      and dedupe_key = 'fixture:create:derived-category'
+  $$,
+  $$values ('social'::text)$$,
+  'create_notification derives category from type instead of trusting callers'
+);
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Original title',
+      'Original body',
+      '/app/chats/original',
+      '{"version":1}'::jsonb,
+      'fixture:create:idempotent',
+      '2026-08-01 13:00:00+00'::timestamptz,
+      false
+    )
+  $$,
+  'create_notification inserts the first deduplicated notification'
+);
+
+update public.notifications
+set read_at = '2026-08-01 14:00:00+00'::timestamptz,
+    seen_at = '2026-08-01 14:00:00+00'::timestamptz
+where user_id = '10000000-0000-4000-8000-000000000001'
+  and dedupe_key = 'fixture:create:idempotent';
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Replacement title',
+      'Replacement body',
+      '/app/chats/replacement',
+      '{"version":2}'::jsonb,
+      'fixture:create:idempotent',
+      '2026-08-02 13:00:00+00'::timestamptz,
+      false
+    )
+  $$,
+  'duplicate creation without reopen returns the existing notification'
+);
+
+select results_eq(
+  $$
+    select
+      count(*)::integer,
+      min(title),
+      min(body),
+      min(url),
+      min(data::text),
+      min(last_event_at),
+      bool_and(read_at is not null),
+      bool_and(seen_at is not null)
+    from public.notifications
+    where user_id = '10000000-0000-4000-8000-000000000001'
+      and dedupe_key = 'fixture:create:idempotent'
+  $$,
+  $$
+    values (
+      1,
+      'Original title'::text,
+      'Original body'::text,
+      '/app/chats/original'::text,
+      '{"version": 1}'::text,
+      '2026-08-01 13:00:00+00'::timestamptz,
+      true,
+      true
+    )
+  $$,
+  'p_reopen false preserves existing content event time and read state'
+);
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Ignored reopened title',
+      'Reopened body',
+      '/app/chats/ignored-reopen-url',
+      '{"version":3}'::jsonb,
+      'fixture:create:idempotent',
+      '2026-08-03 13:00:00+00'::timestamptz,
+      true
+    )
+  $$,
+  'duplicate creation with reopen returns the reopened notification'
+);
+
+select results_eq(
+  $$
+    select
+      count(*)::integer,
+      min(body),
+      min(data::text),
+      min(last_event_at),
+      bool_and(read_at is null),
+      bool_and(seen_at is null)
+    from public.notifications
+    where user_id = '10000000-0000-4000-8000-000000000001'
+      and dedupe_key = 'fixture:create:idempotent'
+  $$,
+  $$
+    values (
+      1,
+      'Reopened body'::text,
+      '{"version": 3}'::text,
+      '2026-08-03 13:00:00+00'::timestamptz,
+      true,
+      true
+    )
+  $$,
+  'p_reopen true updates body data and time while clearing read and seen state'
+);
+
+update public.notifications
+set read_at = '2026-08-03 14:00:00+00'::timestamptz,
+    seen_at = '2026-08-03 14:00:00+00'::timestamptz
+where user_id = '10000000-0000-4000-8000-000000000001'
+  and dedupe_key = 'fixture:create:idempotent';
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '10000000-0000-4000-8000-000000000001',
+      'chat_message',
+      'Stale title',
+      'Stale body',
+      '/app/chats/stale',
+      '{"version":2}'::jsonb,
+      'fixture:create:idempotent',
+      '2026-08-02 13:00:00+00'::timestamptz,
+      true
+    )
+  $$,
+  'an older reopen event returns the current notification'
+);
+
+select results_eq(
+  $$
+    select
+      body,
+      data::text,
+      last_event_at,
+      read_at is not null,
+      seen_at is not null
+    from public.notifications
+    where user_id = '10000000-0000-4000-8000-000000000001'
+      and dedupe_key = 'fixture:create:idempotent'
+  $$,
+  $$
+    values (
+      'Reopened body'::text,
+      '{"version": 3}'::text,
+      '2026-08-03 13:00:00+00'::timestamptz,
+      true,
+      true
+    )
+  $$,
+  'an older reopen event cannot overwrite newer content or clear read state'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$
+    select id, read_at is not null, seen_at is not null
+    from public.mark_notification_read(
+      '10000000-0000-4000-8000-000000000002'
+    )
+  $$,
+  $$values ('10000000-0000-4000-8000-000000000002'::uuid, true, true)$$,
+  'mark_notification_read sets read and seen for an owned notification'
+);
+
+select throws_ok(
+  $$
+    select public.mark_notification_read(
+      '20000000-0000-4000-8000-000000000002'
+    )
+  $$,
+  '42501'::char(5),
+  'Not authorized',
+  'mark_notification_read rejects another owner notification'
+);
+
+reset role;
+
+update public.notifications
+set read_at = coalesce(read_at, now()),
+    seen_at = coalesce(seen_at, now())
+where user_id = '10000000-0000-4000-8000-000000000001';
+
+insert into public.notifications (
+  id, user_id, type, category, title, body, url, dedupe_key
+)
+values
+  (
+    '10000000-0000-4000-8000-000000000011',
+    '10000000-0000-4000-8000-000000000001',
+    'pulse_prompt',
+    'reminders',
+    'Pulse one',
+    'First unread notification.',
+    '/app',
+    'fixture:mark-all:1'
+  ),
+  (
+    '10000000-0000-4000-8000-000000000012',
+    '10000000-0000-4000-8000-000000000001',
+    'pulse_prompt',
+    'reminders',
+    'Pulse two',
+    'Second unread notification.',
+    '/app',
+    'fixture:mark-all:2'
+  );
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$select public.mark_all_notifications_read()$$,
+  $$values (2)$$,
+  'mark_all_notifications_read returns the number of caller-owned unread rows'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    select
+      count(*) filter (
+        where user_id = '10000000-0000-4000-8000-000000000001'
+          and read_at is null
+      )::integer,
+      count(*) filter (
+        where user_id = '20000000-0000-4000-8000-000000000001'
+          and read_at is null
+      )::integer
+    from public.notifications
+  $$,
+  $$values (0, 1)$$,
+  'mark_all_notifications_read changes only the caller owned rows'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$
+    select
+      push_enabled,
+      chat_enabled,
+      activities_enabled,
+      reminders_enabled,
+      social_enabled,
+      safety_enabled,
+      digest_enabled,
+      rewards_enabled,
+      quiet_hours_start,
+      quiet_hours_end,
+      timezone,
+      daily_push_cap
+    from public.update_notification_preferences(
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      '22:30'::time,
+      '07:15'::time,
+      'America/Los_Angeles',
+      25
+    )
+  $$,
+  $$
+    values (
+      false,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      '22:30'::time,
+      '07:15'::time,
+      'America/Los_Angeles'::text,
+      25
+    )
+  $$,
+  'update_notification_preferences accepts approved scalar values'
+);
+
+select throws_ok(
+  $$
+    select public.update_notification_preferences(
+      true, true, true, true, true, true, false, true,
+      null, null, 'Mars/Olympus_Mons', 10
+    )
+  $$,
+  '22023'::char(5),
+  'Unsupported timezone',
+  'update_notification_preferences validates pg_timezone_names'
+);
+
+select throws_ok(
+  $$
+    select public.update_notification_preferences(
+      true, true, true, true, true, true, false, true,
+      null, null, 'UTC', 0
+    )
+  $$,
+  '22023'::char(5),
+  'Daily push cap must be between 1 and 50',
+  'update_notification_preferences rejects a cap below one'
+);
+
+select throws_ok(
+  $$
+    select public.update_notification_preferences(
+      true, true, true, true, true, true, false, true,
+      null, null, 'UTC', 51
+    )
+  $$,
+  '22023'::char(5),
+  'Daily push cap must be between 1 and 50',
+  'update_notification_preferences rejects a cap above fifty'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    select push_enabled, timezone, daily_push_cap
+    from public.notification_preferences
+    where user_id = '20000000-0000-4000-8000-000000000001'
+  $$,
+  $$values (true, 'America/New_York'::text, 10)$$,
+  'preference updates cannot change another owner row'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$
+    select
+      user_id,
+      endpoint,
+      p256dh,
+      auth,
+      user_agent,
+      disabled_at is null,
+      failure_count
+    from public.save_push_subscription(
+      'https://push.example.test/subscriptions/fixed-fixture',
+      'owner-updated-p256dh',
+      'owner-updated-auth',
+      'updated fixture browser'
+    )
+  $$,
+  $$
+    values (
+      '10000000-0000-4000-8000-000000000001'::uuid,
+      'https://push.example.test/subscriptions/fixed-fixture'::text,
+      'owner-updated-p256dh'::text,
+      'owner-updated-auth'::text,
+      'updated fixture browser'::text,
+      true,
+      0
+    )
+  $$,
+  'save_push_subscription refreshes the caller current endpoint and keys'
+);
+
+select lives_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/fixed-fixture',
+      'owner-updated-p256dh',
+      'owner-updated-auth',
+      'updated fixture browser'
+    )
+  $$,
+  'save_push_subscription is idempotent for the caller current subscription'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from public.push_subscriptions
+    where endpoint = 'https://push.example.test/subscriptions/fixed-fixture'
+  $$,
+  $$values (1)$$,
+  'idempotent subscription saves keep one endpoint row'
+);
+
+select lives_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/disable-me',
+      'disable-p256dh',
+      'disable-auth',
+      null
+    )
+  $$,
+  'save_push_subscription creates a second caller device'
+);
+
+select is(
+  public.disable_push_subscription(
+    'https://push.example.test/subscriptions/other-owner'
+  ),
+  false,
+  'disable_push_subscription does not affect another owner endpoint'
+);
+
+select is(
+  public.disable_push_subscription(
+    'https://push.example.test/subscriptions/disable-me'
+  ),
+  true,
+  'disable_push_subscription disables the caller endpoint'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    select
+      count(*) filter (
+        where endpoint = 'https://push.example.test/subscriptions/other-owner'
+          and disabled_at is null
+      )::integer,
+      count(*) filter (
+        where endpoint = 'https://push.example.test/subscriptions/disable-me'
+          and disabled_at is not null
+      )::integer
+    from public.push_subscriptions
+  $$,
+  $$values (1, 1)$$,
+  'disable_push_subscription changes only the caller matching endpoint'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/fixed-fixture',
+      'wrong-p256dh',
+      'wrong-auth',
+      'attacker browser'
+    )
+  $$,
+  '42501'::char(5),
+  'Not authorized',
+  'endpoint transfer rejects callers that do not possess the current keys'
+);
+
+select results_eq(
+  $$
+    select user_id, endpoint, p256dh, auth, disabled_at is null
+    from public.save_push_subscription(
+      'https://push.example.test/subscriptions/fixed-fixture',
+      'owner-updated-p256dh',
+      'owner-updated-auth',
+      'new owner browser'
+    )
+  $$,
+  $$
+    values (
+      '20000000-0000-4000-8000-000000000001'::uuid,
+      'https://push.example.test/subscriptions/fixed-fixture'::text,
+      'owner-updated-p256dh'::text,
+      'owner-updated-auth'::text,
+      true
+    )
+  $$,
+  'a caller proving endpoint and key possession receives a new active subscription'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    select
+      user_id,
+      endpoint,
+      p256dh,
+      auth,
+      disabled_at is not null
+    from public.push_subscriptions
+    where id = '10000000-0000-4000-8000-000000000003'
+  $$,
+  $$
+    values (
+      '10000000-0000-4000-8000-000000000001'::uuid,
+      'retired:10000000-0000-4000-8000-000000000003'::text,
+      'retired'::text,
+      'retired'::text,
+      true
+    )
+  $$,
+  'referenced endpoint transfer retires the old owner row with non-secret tombstones'
+);
+
+select results_eq(
+  $$
+    select subscription_id, user_id
+    from public.notification_deliveries
+    where id = '10000000-0000-4000-8000-000000000004'
+  $$,
+  $$
+    values (
+      '10000000-0000-4000-8000-000000000003'::uuid,
+      '10000000-0000-4000-8000-000000000001'::uuid
+    )
+  $$,
+  'referenced endpoint transfer preserves the historical delivery owner and subscription'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from public.push_subscriptions
+    where endpoint = 'https://push.example.test/subscriptions/fixed-fixture'
+      and disabled_at is null
+  $$,
+  $$values (1)$$,
+  'a transferred referenced endpoint has exactly one globally active row'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'retired:10000000-0000-4000-8000-000000000003',
+      'replacement-p256dh',
+      'replacement-auth',
+      'old owner browser'
+    )
+  $$,
+  '22023'::char(5),
+  'Reserved push endpoint',
+  'callers cannot reactivate or squat internal tombstone endpoints'
+);
+
+reset role;
+
+-- Keep the remaining assertions independent when this regression is run RED.
+update public.push_subscriptions
+set p256dh = 'retired',
+    auth = 'retired',
+    user_agent = null,
+    disabled_at = coalesce(disabled_at, now())
+where id = '10000000-0000-4000-8000-000000000003';
+
+insert into public.push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, user_agent
+)
+values (
+  '10000000-0000-4000-8000-000000000013',
+  '10000000-0000-4000-8000-000000000001',
+  'https://push.example.test/subscriptions/unreferenced-transfer',
+  'unreferenced-p256dh',
+  'unreferenced-auth',
+  'unreferenced old owner browser'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '20000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$
+    select user_id, endpoint, disabled_at is null
+    from public.save_push_subscription(
+      'https://push.example.test/subscriptions/unreferenced-transfer',
+      'unreferenced-p256dh',
+      'unreferenced-auth',
+      'unreferenced new owner browser'
+    )
+  $$,
+  $$
+    values (
+      '20000000-0000-4000-8000-000000000001'::uuid,
+      'https://push.example.test/subscriptions/unreferenced-transfer'::text,
+      true
+    )
+  $$,
+  'unreferenced endpoint transfer creates a new active row for the caller'
+);
+
+select results_eq(
+  $$
+    select endpoint
+    from public.push_subscriptions
+    where endpoint in (
+      'https://push.example.test/subscriptions/unreferenced-transfer',
+      'retired:10000000-0000-4000-8000-000000000013'
+    )
+    order by endpoint
+  $$,
+  $$values ('https://push.example.test/subscriptions/unreferenced-transfer'::text)$$,
+  'endpoint transfer never exposes another owner retired row through RLS'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    select
+      user_id,
+      endpoint,
+      p256dh,
+      auth,
+      disabled_at is not null
+    from public.push_subscriptions
+    where id = '10000000-0000-4000-8000-000000000013'
+  $$,
+  $$
+    values (
+      '10000000-0000-4000-8000-000000000001'::uuid,
+      'retired:10000000-0000-4000-8000-000000000013'::text,
+      'retired'::text,
+      'retired'::text,
+      true
+    )
+  $$,
+  'unreferenced endpoint transfer also retires the old owner row safely'
+);
+
+select results_eq(
+  $$
+    select
+      count(*) filter (
+        where endpoint = 'https://push.example.test/subscriptions/unreferenced-transfer'
+          and disabled_at is null
+      )::integer,
+      count(*) filter (
+        where subscription_id = '10000000-0000-4000-8000-000000000013'
+      )::integer
+    from public.push_subscriptions
+    left join public.notification_deliveries
+      on notification_deliveries.subscription_id = push_subscriptions.id
+  $$,
+  $$values (1, 0)$$,
+  'unreferenced transfer keeps one active endpoint and introduces no historical delivery'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from (
+      values
+        ('anon'::name),
+        ('authenticated'::name)
+    ) as roles(role_name)
+    cross join lateral (
+      values
+        (pg_catalog.to_regprocedure(
+          'public.create_notification(uuid,public.notification_type,text,text,text,jsonb,text,timestamp with time zone,boolean)'
+        )),
+        (pg_catalog.to_regprocedure(
+          'public.notification_category_for_type(public.notification_type)'
+        )),
+        (pg_catalog.to_regprocedure('public.is_safe_notification_path(text)')),
+        ('public.handle_new_user()'::regprocedure),
+        ('public.handle_updated_at()'::regprocedure)
+    ) as functions(function_oid)
+    where coalesce(
+      pg_catalog.has_function_privilege(
+        roles.role_name,
+        functions.function_oid,
+        'execute'
+      ),
+      false
+    )
+  $$,
+  $$values (0)$$,
+  'internal notification creation helpers and trigger functions are unavailable to clients'
 );
 
 select * from finish();
