@@ -95,10 +95,14 @@ export default function FeedPage() {
       <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">Huddle</p>
-            <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
+            <div className="flex items-center gap-3 mb-2">
+              <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">Huddle</p>
+            </div>
+            <h1 className="font-heading text-3xl font-black leading-none text-white">
               Hey, {currentProfile.firstName} 👋
             </h1>
+            <p className="mt-1 text-sm text-white/62">Discover events, connect with people, and huddle up together.</p>
           </div>
           <div className="flex items-center gap-2">
             <button
