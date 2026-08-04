@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, auth;
 
-select plan(18);
+select plan(24);
 
 select has_table('public', 'notifications', 'public.notifications exists');
 select has_table(
@@ -52,6 +52,44 @@ select col_is_unique(
   'notification_deliveries',
   array['notification_id', 'subscription_id']
 );
+select results_eq(
+  $$
+    select
+      index_catalog.indpred is null,
+      pg_catalog.pg_get_indexdef(index_catalog.indexrelid, 1, true)
+    from pg_catalog.pg_index as index_catalog
+    join pg_catalog.pg_class as index_relation
+      on index_relation.oid = index_catalog.indexrelid
+    join pg_catalog.pg_class as table_relation
+      on table_relation.oid = index_catalog.indrelid
+    join pg_catalog.pg_namespace as table_namespace
+      on table_namespace.oid = table_relation.relnamespace
+    where table_namespace.nspname = 'public'
+      and table_relation.relname = 'push_subscriptions'
+      and index_relation.relname = 'push_subscriptions_user_id_idx'
+  $$,
+  $$values (true, 'user_id'::text)$$,
+  'push subscriptions have a full owner index'
+);
+select results_eq(
+  $$
+    select
+      index_catalog.indpred is null,
+      pg_catalog.pg_get_indexdef(index_catalog.indexrelid, 1, true)
+    from pg_catalog.pg_index as index_catalog
+    join pg_catalog.pg_class as index_relation
+      on index_relation.oid = index_catalog.indexrelid
+    join pg_catalog.pg_class as table_relation
+      on table_relation.oid = index_catalog.indrelid
+    join pg_catalog.pg_namespace as table_namespace
+      on table_namespace.oid = table_relation.relnamespace
+    where table_namespace.nspname = 'public'
+      and table_relation.relname = 'notification_deliveries'
+      and index_relation.relname = 'notification_deliveries_subscription_id_idx'
+  $$,
+  $$values (true, 'subscription_id'::text)$$,
+  'notification deliveries have a full subscription cascade index'
+);
 
 insert into auth.users (
   instance_id,
@@ -76,6 +114,33 @@ values (
   now(),
   '{"provider":"email","providers":["email"]}'::jsonb,
   '{"first_name":"Notification","last_name":"Fixture"}'::jsonb,
+  now(),
+  now()
+);
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '20000000-0000-4000-8000-000000000001',
+  'authenticated',
+  'authenticated',
+  'notification-other-owner@umd.edu',
+  '',
+  now(),
+  '{"provider":"email","providers":["email"]}'::jsonb,
+  '{"first_name":"Other","last_name":"Owner"}'::jsonb,
   now(),
   now()
 );
@@ -121,15 +186,53 @@ values (
   'pgTAP fixture browser'
 );
 
-insert into public.notification_deliveries (
+insert into public.push_subscriptions (
   id,
-  notification_id,
-  subscription_id
+  user_id,
+  endpoint,
+  p256dh,
+  auth,
+  user_agent
 )
 values (
-  '10000000-0000-4000-8000-000000000004',
-  '10000000-0000-4000-8000-000000000002',
-  '10000000-0000-4000-8000-000000000003'
+  '20000000-0000-4000-8000-000000000003',
+  '20000000-0000-4000-8000-000000000001',
+  'https://push.example.test/subscriptions/other-owner',
+  'other-owner-p256dh',
+  'other-owner-auth',
+  'pgTAP other-owner browser'
+);
+
+select lives_ok(
+  $$
+    insert into public.notification_deliveries (
+      id, notification_id, subscription_id, user_id
+    )
+    values (
+      '10000000-0000-4000-8000-000000000004',
+      '10000000-0000-4000-8000-000000000002',
+      '10000000-0000-4000-8000-000000000003',
+      '10000000-0000-4000-8000-000000000001'
+    )
+  $$,
+  'a delivery may pair a notification with a subscription owned by the same user'
+);
+
+select throws_ok(
+  $$
+    insert into public.notification_deliveries (
+      id, notification_id, subscription_id, user_id
+    )
+    values (
+      '20000000-0000-4000-8000-000000000004',
+      '10000000-0000-4000-8000-000000000002',
+      '20000000-0000-4000-8000-000000000003',
+      '10000000-0000-4000-8000-000000000001'
+    )
+  $$,
+  '23503'::char(5),
+  'insert or update on table "notification_deliveries" violates foreign key constraint "notification_deliveries_subscription_owner_fk"',
+  'a delivery cannot pair a notification with another user''s subscription'
 );
 
 select throws_like(
@@ -208,6 +311,39 @@ select results_eq(
     )
   $$,
   'notification preference defaults are internally consistent'
+);
+
+select is(
+  enum_range(null::public.notification_category)::text[],
+  array['chat', 'activities', 'reminders', 'social', 'safety', 'digest', 'rewards']::text[],
+  'notification categories match the approved contract'
+);
+
+select is(
+  enum_range(null::public.notification_type)::text[],
+  array[
+    'chat_message',
+    'chat_opened',
+    'activity_joined',
+    'activity_approved',
+    'activity_rejected',
+    'event_reminder_24h',
+    'event_reminder_1h',
+    'waitlist_promoted',
+    'pulse_prompt',
+    'friend_request',
+    'friend_accepted',
+    'friend_rsvp',
+    'safety_review',
+    'safety_report_status',
+    'activity_match_digest',
+    'weekly_recap',
+    'streak_at_risk',
+    'points_milestone',
+    'badge_unlocked',
+    'leaderboard_placement'
+  ]::text[],
+  'notification types match the approved contract'
 );
 
 select is(

@@ -80,6 +80,7 @@ create table if not exists public.notifications (
   seen_at timestamptz,
   created_at timestamptz not null default now(),
   last_event_at timestamptz not null default now(),
+  constraint notifications_id_user_id_key unique (id, user_id),
   constraint notifications_user_dedupe_key_key unique (user_id, dedupe_key),
   constraint notifications_title_check check (
     btrim(title) <> '' and char_length(title) <= 120
@@ -137,11 +138,15 @@ create table if not exists public.push_subscriptions (
   last_seen_at timestamptz not null default now(),
   failure_count integer not null default 0,
   disabled_at timestamptz,
+  constraint push_subscriptions_id_user_id_key unique (id, user_id),
   constraint push_subscriptions_endpoint_check check (btrim(endpoint) <> ''),
   constraint push_subscriptions_p256dh_check check (btrim(p256dh) <> ''),
   constraint push_subscriptions_auth_check check (btrim(auth) <> ''),
   constraint push_subscriptions_failure_count_check check (failure_count >= 0)
 );
+
+create index if not exists push_subscriptions_user_id_idx
+  on public.push_subscriptions (user_id);
 
 create index if not exists push_subscriptions_active_owner_idx
   on public.push_subscriptions (user_id, last_seen_at desc, id)
@@ -149,8 +154,9 @@ create index if not exists push_subscriptions_active_owner_idx
 
 create table if not exists public.notification_deliveries (
   id uuid primary key default gen_random_uuid(),
-  notification_id uuid not null references public.notifications (id) on delete cascade,
-  subscription_id uuid not null references public.push_subscriptions (id) on delete cascade,
+  notification_id uuid not null,
+  subscription_id uuid not null,
+  user_id uuid not null,
   state public.notification_delivery_state not null default 'pending',
   deliver_after timestamptz not null default now(),
   claimed_at timestamptz,
@@ -161,8 +167,19 @@ create table if not exists public.notification_deliveries (
   updated_at timestamptz not null default now(),
   constraint notification_deliveries_notification_subscription_key
     unique (notification_id, subscription_id),
-  constraint notification_deliveries_attempts_check check (attempts >= 0)
+  constraint notification_deliveries_attempts_check check (attempts >= 0),
+  constraint notification_deliveries_notification_owner_fk
+    foreign key (notification_id, user_id)
+    references public.notifications (id, user_id)
+    on delete cascade,
+  constraint notification_deliveries_subscription_owner_fk
+    foreign key (subscription_id, user_id)
+    references public.push_subscriptions (id, user_id)
+    on delete cascade
 );
+
+create index if not exists notification_deliveries_subscription_id_idx
+  on public.notification_deliveries (subscription_id);
 
 create index if not exists notification_deliveries_due_idx
   on public.notification_deliveries (deliver_after, id)
