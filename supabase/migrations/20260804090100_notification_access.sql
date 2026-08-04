@@ -7,6 +7,7 @@ returns public.notification_category
 language sql
 immutable
 strict
+security definer
 set search_path = ''
 as $$
   select case p_type
@@ -37,6 +38,7 @@ create or replace function public.is_safe_notification_path(p_path text)
 returns boolean
 language sql
 immutable
+security definer
 set search_path = ''
 as $$
   select
@@ -46,7 +48,8 @@ as $$
     and p_path !~ '//'
     and p_path !~ '[[:cntrl:][:space:]]'
     and pg_catalog.strpos(p_path, pg_catalog.chr(92)) = 0
-    and pg_catalog.lower(p_path) !~ '%(00|0a|0d|5c)'
+    and pg_catalog.lower(p_path) !~ '%25'
+    and pg_catalog.lower(p_path) !~ '%([01][0-9a-f]|7f|2f|5c)'
     and pg_catalog.lower(p_path)
       !~ '(^|/)([.]|%2e)([.]|%2e)($|/|%2f|[?#])';
 $$;
@@ -356,14 +359,26 @@ begin
   if p_endpoint is null or pg_catalog.btrim(p_endpoint) = '' then
     raise exception 'Push endpoint is required' using errcode = '22023';
   end if;
+  if pg_catalog.char_length(p_endpoint) > 4096 then
+    raise exception 'Push endpoint exceeds 4096 characters' using errcode = '22023';
+  end if;
   if pg_catalog.lower(p_endpoint) like 'retired:%' then
     raise exception 'Reserved push endpoint' using errcode = '22023';
   end if;
   if p_p256dh is null or pg_catalog.btrim(p_p256dh) = '' then
     raise exception 'Push p256dh key is required' using errcode = '22023';
   end if;
+  if pg_catalog.char_length(p_p256dh) > 1024 then
+    raise exception 'Push p256dh key exceeds 1024 characters' using errcode = '22023';
+  end if;
   if p_auth is null or pg_catalog.btrim(p_auth) = '' then
     raise exception 'Push auth key is required' using errcode = '22023';
+  end if;
+  if pg_catalog.char_length(p_auth) > 1024 then
+    raise exception 'Push auth key exceeds 1024 characters' using errcode = '22023';
+  end if;
+  if p_user_agent is not null and pg_catalog.char_length(p_user_agent) > 512 then
+    raise exception 'Push user agent exceeds 512 characters' using errcode = '22023';
   end if;
 
   -- Serializes first registration as well as transfers; the row lock below protects

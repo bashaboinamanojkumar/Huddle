@@ -133,6 +133,74 @@ insert into auth.users (
 )
 values (
   '00000000-0000-0000-0000-000000000000',
+  '30000000-0000-4000-8000-000000000009',
+  'authenticated',
+  'authenticated',
+  'trigger-provision@umaryland.edu',
+  '',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Trigger Provision"}'::jsonb,
+  now(),
+  now()
+);
+
+select results_eq(
+  $$
+    select id, email, first_name, last_initial, university_id
+    from public.profiles
+    where id = '30000000-0000-4000-8000-000000000009'
+  $$,
+  $$
+    values (
+      '30000000-0000-4000-8000-000000000009'::uuid,
+      'trigger-provision@umaryland.edu'::text,
+      'Trigger'::text,
+      'P'::text,
+      'umb'::text
+    )
+  $$,
+  'the auth user trigger creates a derived profile for a fresh user'
+);
+
+select results_eq(
+  $$
+    select
+      user_id,
+      push_enabled,
+      digest_enabled,
+      timezone,
+      daily_push_cap
+    from public.notification_preferences
+    where user_id = '30000000-0000-4000-8000-000000000009'
+  $$,
+  $$
+    values (
+      '30000000-0000-4000-8000-000000000009'::uuid,
+      true,
+      false,
+      'America/New_York'::text,
+      10
+    )
+  $$,
+  'the auth user trigger provisions default notification preferences'
+);
+
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
   '20000000-0000-4000-8000-000000000001',
   'authenticated',
   'authenticated',
@@ -165,14 +233,6 @@ values (
   '/app/chats/10000000-0000-4000-8000-000000000099',
   'fixture:chat:1'
 );
-
-insert into public.notification_preferences (user_id)
-values ('10000000-0000-4000-8000-000000000001')
-on conflict (user_id) do nothing;
-
-insert into public.notification_preferences (user_id)
-values ('20000000-0000-4000-8000-000000000001')
-on conflict (user_id) do nothing;
 
 insert into public.notifications (
   id,
@@ -686,6 +746,8 @@ select results_eq(
       on namespace.oid = proc.pronamespace
     where namespace.nspname = 'public'
       and proc.proname in (
+        'notification_category_for_type',
+        'is_safe_notification_path',
         'create_notification',
         'mark_notification_read',
         'mark_all_notifications_read',
@@ -695,11 +757,35 @@ select results_eq(
         'handle_new_user',
         'ensure_profile'
       )
-      and proc.prosecdef
       and not coalesce(proc.proconfig, '{}'::text[]) @> array['search_path=""']
   $$,
   $$values (0)$$,
   'all notification security-definer functions fix an empty search_path'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from pg_catalog.pg_proc as proc
+    join pg_catalog.pg_namespace as namespace
+      on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'public'
+      and proc.proname in (
+        'notification_category_for_type',
+        'is_safe_notification_path',
+        'create_notification',
+        'mark_notification_read',
+        'mark_all_notifications_read',
+        'update_notification_preferences',
+        'save_push_subscription',
+        'disable_push_subscription',
+        'handle_new_user',
+        'ensure_profile'
+      )
+      and not proc.prosecdef
+  $$,
+  $$values (0)$$,
+  'every expected notification definer function is SECURITY DEFINER'
 );
 
 select results_eq(
@@ -797,8 +883,18 @@ select results_eq(
         ('/app/activities'::text),
         ('/app?tab=inbox'::text),
         ('/app#notifications'::text),
+        ('/app?message=hello%20world&email=student%40umd.edu'::text),
         ('/app/../admin'::text),
         ('/app/%2e%2e/admin'::text),
+        ('/app/%2f%2fevil.example'::text),
+        ('/app/%5cadmin'::text),
+        ('/app/%09tab'::text),
+        ('/app/%1funit-separator'::text),
+        ('/app/%7fdelete'::text),
+        ('/app/%252e%252e/admin'::text),
+        ('/app/%255cadmin'::text),
+        ('/app/%250aadmin'::text),
+        ('/app/%252f%252fevil.example'::text),
         ('//evil.example/path'::text),
         ('https://evil.example/app'::text),
         (E'/app\\evil'::text),
@@ -812,8 +908,18 @@ select results_eq(
       ('/app/activities'::text, true),
       ('/app?tab=inbox'::text, true),
       ('/app#notifications'::text, true),
+      ('/app?message=hello%20world&email=student%40umd.edu'::text, true),
       ('/app/../admin'::text, false),
       ('/app/%2e%2e/admin'::text, false),
+      ('/app/%2f%2fevil.example'::text, false),
+      ('/app/%5cadmin'::text, false),
+      ('/app/%09tab'::text, false),
+      ('/app/%1funit-separator'::text, false),
+      ('/app/%7fdelete'::text, false),
+      ('/app/%252e%252e/admin'::text, false),
+      ('/app/%255cadmin'::text, false),
+      ('/app/%250aadmin'::text, false),
+      ('/app/%252f%252fevil.example'::text, false),
       ('//evil.example/path'::text, false),
       ('https://evil.example/app'::text, false),
       (E'/app\\evil'::text, false),
@@ -1419,6 +1525,117 @@ select results_eq(
   $$,
   $$values (1)$$,
   'idempotent subscription saves keep one endpoint row'
+);
+
+select results_eq(
+  $$
+    select
+      pg_catalog.char_length(endpoint),
+      pg_catalog.char_length(p256dh),
+      pg_catalog.char_length(auth),
+      pg_catalog.char_length(user_agent)
+    from public.save_push_subscription(
+      'https://push.example.test/boundary/'
+        || repeat(
+          'e',
+          4096 - pg_catalog.char_length('https://push.example.test/boundary/')
+        ),
+      repeat('p', 1024),
+      repeat('a', 1024),
+      repeat('u', 512)
+    )
+  $$,
+  $$values (4096, 1024, 1024, 512)$$,
+  'save_push_subscription accepts every input at its exact size limit'
+);
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      repeat('e', 4097),
+      'endpoint-limit-p256dh',
+      'endpoint-limit-auth',
+      null
+    )
+  $$,
+  '22023'::char(5),
+  'Push endpoint exceeds 4096 characters',
+  'save_push_subscription rejects an over-limit endpoint'
+);
+
+select lives_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/same-owner-bounds',
+      'same-owner-p256dh',
+      'same-owner-auth',
+      null
+    )
+  $$,
+  'same-owner bounds fixture is registered'
+);
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/same-owner-bounds',
+      repeat('p', 1025),
+      'same-owner-auth',
+      null
+    )
+  $$,
+  '22023'::char(5),
+  'Push p256dh key exceeds 1024 characters',
+  'same-owner subscription refresh rejects an over-limit p256dh key'
+);
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/auth-bounds',
+      'auth-limit-p256dh',
+      repeat('a', 1025),
+      null
+    )
+  $$,
+  '22023'::char(5),
+  'Push auth key exceeds 1024 characters',
+  'new subscription registration rejects an over-limit auth key'
+);
+
+reset role;
+
+insert into public.push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, user_agent
+)
+values (
+  '20000000-0000-4000-8000-000000000014',
+  '20000000-0000-4000-8000-000000000001',
+  'https://push.example.test/subscriptions/transfer-bounds',
+  'transfer-bounds-p256dh',
+  'transfer-bounds-auth',
+  'old transfer browser'
+);
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://push.example.test/subscriptions/transfer-bounds',
+      'transfer-bounds-p256dh',
+      'transfer-bounds-auth',
+      repeat('u', 513)
+    )
+  $$,
+  '22023'::char(5),
+  'Push user agent exceeds 512 characters',
+  'subscription transfer rejects an over-limit user agent before ownership changes'
 );
 
 select lives_ok(
