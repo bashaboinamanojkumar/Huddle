@@ -1,5 +1,6 @@
 "use client"
 
+import { CategoryIcon } from "@/components/huddle/category-icon"
 import { EventsMap } from "@/components/huddle/events-map"
 import { List, Map as MapIcon } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -148,7 +149,32 @@ export default function CommunityPage() {
             </button>
           ))}
         </div>
-
+        <div className="mt-4">
+          <h2 className="font-heading text-lg font-black text-white mb-3">Explore by category</h2>
+          <div className="flex gap-3 overflow-x-auto pb-2">
+            {categoryMeta.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setCategory(item.id === category ? "all" : item.id)}
+                className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
+                  category === item.id
+                    ? "border-secondary bg-secondary/18"
+                    : "border-white/10 bg-white/6"
+                }`}
+              >
+                <CategoryIcon
+                  category={item.id}
+                  className="h-6 w-6 text-secondary"
+                />
+                <span className="text-[11px] font-bold text-white text-center leading-tight">{item.shortLabel}</span>
+                <span className="text-[10px] text-white/40">
+                  {approvedActivities.filter(a => a.category === item.id).length} events
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="mt-4 flex items-center justify-between">
         <div>
           <h2 className="font-heading text-xl font-black text-white">Same wavelength</h2>

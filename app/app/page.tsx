@@ -146,7 +146,7 @@ export default function FeedPage() {
           </div>
           {attendingActivities.length === 0 ? (
             <div className="glass-card rounded-[2rem] p-6 text-center">
-              <img src="/ollie.png" alt="Ollie the otter" className="mx-auto h-24 w-24 object-contain mix-blend-mode-screen" style={{ mixBlendMode: "screen" }} />
+              <img src="/ollie.png" alt="Ollie the otter" className="mx-auto h-24 w-24 object-contain" style={{ mixBlendMode: "screen" }} />
               <h3 className="mt-4 font-heading text-lg font-bold text-white">No huddles yet</h3>
               <p className="mt-2 text-sm leading-6 text-white/56">
                 Browse events and huddle up to something that interests you.
@@ -357,7 +357,7 @@ export default function FeedPage() {
         {acceptedFriends.length === 0 && incomingRequests.length === 0 && outgoingRequests.length === 0 && suggestions.length === 0 && (
           <section>
             <div className="glass-card rounded-[2rem] p-6 text-center">
-              <img src="/ollie.png" alt="Ollie the otter" className="mx-auto h-24 w-24 object-contain mix-blend-mode-screen" style={{ mixBlendMode: "screen" }} />
+              <img src="/ollie.png" alt="Ollie the otter" className="mx-auto h-24 w-24 object-contain" style={{ mixBlendMode: "screen" }} />
               <h3 className="mt-4 font-heading text-lg font-bold text-white">Build your circle</h3>
               <p className="mt-2 text-sm leading-6 text-white/56">
                 Huddle up to events and connect with students on the same wavelength.
