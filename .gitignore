@@ -23,6 +23,7 @@ _plan.txt
 coverage/
 .eslintcache
 .turbo/
+.worktrees/
 
 # Vercel CLI
 .vercel
