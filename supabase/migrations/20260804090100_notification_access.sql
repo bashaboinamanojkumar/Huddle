@@ -59,6 +59,50 @@ as $$
   from parsed_path;
 $$;
 
+create or replace function public.is_safe_push_endpoint(p_endpoint text)
+returns boolean
+language sql
+immutable
+security definer
+set search_path = ''
+as $$
+  with parsed_endpoint as (
+    select pg_catalog.regexp_match(
+      p_endpoint,
+      '^https://([^/?#]+)(/[^?#]+([?][^#]*)?)$',
+      'i'
+    ) as parts
+  ),
+  endpoint_components as (
+    select
+      parts,
+      parts[1] as authority,
+      pg_catalog.regexp_replace(parts[1], ':[0-9]{1,5}$', '') as hostname,
+      pg_catalog.substring(parts[1], ':([0-9]{1,5})$') as port_text
+    from parsed_endpoint
+  )
+  select
+    p_endpoint is not null
+    and pg_catalog.char_length(p_endpoint) between 1 and 4096
+    and p_endpoint = pg_catalog.btrim(p_endpoint)
+    and p_endpoint !~ '[[:cntrl:][:space:]]'
+    and pg_catalog.lower(p_endpoint) not like 'retired:%'
+    and endpoint_components.parts is not null
+    and endpoint_components.authority ~ '^[^:]+(:[0-9]{1,5})?$'
+    and endpoint_components.hostname ~* (
+      '^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?'
+      || '([.][a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*'
+      || '[.][a-z]([a-z0-9-]{0,61}[a-z0-9])?$'
+    )
+    and pg_catalog.lower(endpoint_components.hostname)
+      !~ '(^|[.])(localhost|local)$'
+    and (
+      endpoint_components.port_text is null
+      or endpoint_components.port_text::integer between 1 and 65535
+    )
+  from endpoint_components;
+$$;
+
 create or replace function public.create_notification(
   p_user_id uuid,
   p_type public.notification_type,
@@ -370,6 +414,9 @@ begin
   if pg_catalog.lower(p_endpoint) like 'retired:%' then
     raise exception 'Reserved push endpoint' using errcode = '22023';
   end if;
+  if not coalesce(public.is_safe_push_endpoint(p_endpoint), false) then
+    raise exception 'Unsafe push endpoint' using errcode = '22023';
+  end if;
   if p_p256dh is null or pg_catalog.btrim(p_p256dh) = '' then
     raise exception 'Push p256dh key is required' using errcode = '22023';
   end if;
@@ -597,12 +644,24 @@ revoke all on table public.notification_runtime_config from anon, authenticated;
 
 grant select on table public.notifications to authenticated;
 grant select on table public.notification_preferences to authenticated;
-grant select on table public.push_subscriptions to authenticated;
+grant select (
+  id,
+  user_id,
+  endpoint,
+  user_agent,
+  created_at,
+  updated_at,
+  last_seen_at,
+  failure_count,
+  disabled_at
+) on table public.push_subscriptions to authenticated;
 grant select on table public.notification_runtime_config to authenticated;
 
 revoke execute on function public.notification_category_for_type(public.notification_type)
   from public, anon, authenticated;
 revoke execute on function public.is_safe_notification_path(text)
+  from public, anon, authenticated;
+revoke execute on function public.is_safe_push_endpoint(text)
   from public, anon, authenticated;
 revoke execute on function public.create_notification(
   uuid,

@@ -1,6 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
+create extension if not exists dblink with schema extensions;
 set local search_path = public, extensions, auth;
 
 select no_plan();
@@ -502,9 +503,30 @@ select results_eq(
 );
 
 select results_eq(
-  $$select id from public.push_subscriptions order by id$$,
-  $$values ('10000000-0000-4000-8000-000000000003'::uuid)$$,
+  $$
+    select id, user_id, endpoint, user_agent
+    from public.push_subscriptions
+    order by id
+  $$,
+  $$
+    values (
+      '10000000-0000-4000-8000-000000000003'::uuid,
+      '10000000-0000-4000-8000-000000000001'::uuid,
+      'https://push.example.test/subscriptions/fixed-fixture'::text,
+      'pgTAP fixture browser'::text
+    )
+  $$,
   'authenticated owners can select only their own push subscriptions'
+);
+
+select throws_like(
+  $$
+    select p256dh, auth
+    from public.push_subscriptions
+    where id = '10000000-0000-4000-8000-000000000003'
+  $$,
+  '%permission denied for table push_subscriptions%',
+  'authenticated direct reads cannot select push subscription secrets'
 );
 
 select results_eq(
@@ -719,6 +741,51 @@ select is(
 );
 
 select is(
+  coalesce(
+    pg_catalog.has_function_privilege(
+      'authenticated',
+      pg_catalog.to_regprocedure('public.is_safe_push_endpoint(text)'),
+      'execute'
+    ),
+    false
+  ),
+  false,
+  'authenticated cannot execute push endpoint helpers'
+);
+
+select ok(
+  pg_catalog.has_column_privilege(
+    'authenticated',
+    'public.push_subscriptions',
+    'endpoint',
+    'select'
+  ),
+  'authenticated has direct SELECT privilege on safe subscription columns'
+);
+
+select is(
+  pg_catalog.has_column_privilege(
+    'authenticated',
+    'public.push_subscriptions',
+    'p256dh',
+    'select'
+  ),
+  false,
+  'authenticated has no direct SELECT privilege on p256dh'
+);
+
+select is(
+  pg_catalog.has_column_privilege(
+    'authenticated',
+    'public.push_subscriptions',
+    'auth',
+    'select'
+  ),
+  false,
+  'authenticated has no direct SELECT privilege on auth'
+);
+
+select is(
   pg_catalog.has_function_privilege(
     'authenticated',
     'public.handle_new_user()'::regprocedure,
@@ -748,6 +815,7 @@ select results_eq(
       and proc.proname in (
         'notification_category_for_type',
         'is_safe_notification_path',
+        'is_safe_push_endpoint',
         'create_notification',
         'mark_notification_read',
         'mark_all_notifications_read',
@@ -773,6 +841,7 @@ select results_eq(
       and proc.proname in (
         'notification_category_for_type',
         'is_safe_notification_path',
+        'is_safe_push_endpoint',
         'create_notification',
         'mark_notification_read',
         'mark_all_notifications_read',
@@ -931,6 +1000,81 @@ select results_eq(
       (E'/app/line\nbreak'::text, false)
   $$,
   'notification paths accept app-local forms and reject redirects or unsafe characters'
+);
+
+select results_eq(
+  $$
+    select candidate, public.is_safe_push_endpoint(candidate)
+    from (
+      values
+        ('https://fcm.googleapis.com/fcm/send/AbC_123?token=CaseSensitive'::text),
+        ('https://updates.push.services.mozilla.com/wpush/v2/AbC_123'::text),
+        ('https://web.push.apple.com/QHAbC_123'::text),
+        ('https://push.example.com:65535/subscriptions/port-boundary'::text),
+        ('http://fcm.googleapis.com/fcm/send/insecure'::text),
+        ('ftp://push.example.com/subscriptions/wrong-scheme'::text),
+        ('https://localhost/subscriptions/local'::text),
+        ('https://push.localhost/subscriptions/local'::text),
+        ('https://device.local/subscriptions/local'::text),
+        ('https://8.8.8.8/subscriptions/ip-literal'::text),
+        ('https://0.1.2.3/subscriptions/reserved'::text),
+        ('https://10.1.2.3/subscriptions/private'::text),
+        ('https://100.64.0.1/subscriptions/carrier-nat'::text),
+        ('https://127.0.0.1/subscriptions/loopback'::text),
+        ('https://169.254.1.1/subscriptions/link-local'::text),
+        ('https://172.16.0.1/subscriptions/private'::text),
+        ('https://192.168.1.1/subscriptions/private'::text),
+        ('https://224.0.0.1/subscriptions/multicast'::text),
+        ('https://240.0.0.1/subscriptions/reserved'::text),
+        ('https://[2606:4700:4700::1111]/subscriptions/ipv6'::text),
+        ('https://user:password@push.example.com/subscriptions/credentials'::text),
+        ('https://push.example.com:abc/subscriptions/bad-port'::text),
+        ('https://push.example.com:65536/subscriptions/bad-port'::text),
+        ('https://push.example.com:443:444/subscriptions/bad-authority'::text),
+        ('https://push.example.com'::text),
+        ('https://push.example.com/'::text),
+        ('https://push.example.com/subscriptions/fragment#secret'::text),
+        (' https://push.example.com/subscriptions/leading-space'::text),
+        ('https://push.example.com/subscriptions/trailing-space '::text),
+        (E'https://push.example.com/subscriptions/line\nbreak'::text),
+        ('retired:10000000-0000-4000-8000-000000000003'::text)
+    ) as endpoints(candidate)
+  $$,
+  $$
+    values
+      ('https://fcm.googleapis.com/fcm/send/AbC_123?token=CaseSensitive'::text, true),
+      ('https://updates.push.services.mozilla.com/wpush/v2/AbC_123'::text, true),
+      ('https://web.push.apple.com/QHAbC_123'::text, true),
+      ('https://push.example.com:65535/subscriptions/port-boundary'::text, true),
+      ('http://fcm.googleapis.com/fcm/send/insecure'::text, false),
+      ('ftp://push.example.com/subscriptions/wrong-scheme'::text, false),
+      ('https://localhost/subscriptions/local'::text, false),
+      ('https://push.localhost/subscriptions/local'::text, false),
+      ('https://device.local/subscriptions/local'::text, false),
+      ('https://8.8.8.8/subscriptions/ip-literal'::text, false),
+      ('https://0.1.2.3/subscriptions/reserved'::text, false),
+      ('https://10.1.2.3/subscriptions/private'::text, false),
+      ('https://100.64.0.1/subscriptions/carrier-nat'::text, false),
+      ('https://127.0.0.1/subscriptions/loopback'::text, false),
+      ('https://169.254.1.1/subscriptions/link-local'::text, false),
+      ('https://172.16.0.1/subscriptions/private'::text, false),
+      ('https://192.168.1.1/subscriptions/private'::text, false),
+      ('https://224.0.0.1/subscriptions/multicast'::text, false),
+      ('https://240.0.0.1/subscriptions/reserved'::text, false),
+      ('https://[2606:4700:4700::1111]/subscriptions/ipv6'::text, false),
+      ('https://user:password@push.example.com/subscriptions/credentials'::text, false),
+      ('https://push.example.com:abc/subscriptions/bad-port'::text, false),
+      ('https://push.example.com:65536/subscriptions/bad-port'::text, false),
+      ('https://push.example.com:443:444/subscriptions/bad-authority'::text, false),
+      ('https://push.example.com'::text, false),
+      ('https://push.example.com/'::text, false),
+      ('https://push.example.com/subscriptions/fragment#secret'::text, false),
+      (' https://push.example.com/subscriptions/leading-space'::text, false),
+      ('https://push.example.com/subscriptions/trailing-space '::text, false),
+      (E'https://push.example.com/subscriptions/line\nbreak'::text, false),
+      ('retired:10000000-0000-4000-8000-000000000003'::text, false)
+  $$,
+  'push endpoint validation permits public Web Push URLs and rejects unsafe egress targets'
 );
 
 select throws_ok(
@@ -1531,6 +1675,78 @@ select results_eq(
   'idempotent subscription saves keep one endpoint row'
 );
 
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://localhost/subscriptions/new-unsafe-endpoint',
+      'unsafe-new-p256dh',
+      'unsafe-new-auth',
+      null
+    )
+  $$,
+  '22023'::char(5),
+  'Unsafe push endpoint',
+  'new subscription registration rejects unsafe egress endpoints'
+);
+
+reset role;
+
+insert into public.push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, user_agent
+)
+values
+  (
+    '10000000-0000-4000-8000-000000000015',
+    '10000000-0000-4000-8000-000000000001',
+    'https://127.0.0.1/subscriptions/same-owner-unsafe',
+    'unsafe-same-owner-p256dh',
+    'unsafe-same-owner-auth',
+    null
+  ),
+  (
+    '20000000-0000-4000-8000-000000000015',
+    '20000000-0000-4000-8000-000000000001',
+    'https://10.0.0.1/subscriptions/transfer-unsafe',
+    'unsafe-transfer-p256dh',
+    'unsafe-transfer-auth',
+    null
+  );
+
+select set_config(
+  'request.jwt.claim.sub',
+  '10000000-0000-4000-8000-000000000001',
+  true
+);
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://127.0.0.1/subscriptions/same-owner-unsafe',
+      'unsafe-same-owner-p256dh',
+      'unsafe-same-owner-auth',
+      null
+    )
+  $$,
+  '22023'::char(5),
+  'Unsafe push endpoint',
+  'same-owner refresh rejects unsafe egress endpoints'
+);
+
+select throws_ok(
+  $$
+    select public.save_push_subscription(
+      'https://10.0.0.1/subscriptions/transfer-unsafe',
+      'unsafe-transfer-p256dh',
+      'unsafe-transfer-auth',
+      null
+    )
+  $$,
+  '22023'::char(5),
+  'Unsafe push endpoint',
+  'endpoint transfer rejects unsafe egress endpoints before ownership changes'
+);
+
 select results_eq(
   $$
     select
@@ -1927,6 +2143,7 @@ select results_eq(
           'public.notification_category_for_type(public.notification_type)'
         )),
         (pg_catalog.to_regprocedure('public.is_safe_notification_path(text)')),
+        (pg_catalog.to_regprocedure('public.is_safe_push_endpoint(text)')),
         ('public.handle_new_user()'::regprocedure),
         ('public.handle_updated_at()'::regprocedure)
     ) as functions(function_oid)
@@ -1941,6 +2158,506 @@ select results_eq(
   $$,
   $$values (0)$$,
   'internal notification creation helpers and trigger functions are unavailable to clients'
+);
+
+-- Bounded two-session checks prove the advisory/row locks under real contention.
+reset role;
+
+select is(
+  extensions.dblink_connect(
+    'notification_concurrency_a',
+    'host=host.docker.internal port=54322 dbname=postgres user=postgres password=postgres connect_timeout=3'
+  ),
+  'OK'::text,
+  'first concurrency connection opens'
+);
+
+select is(
+  extensions.dblink_connect(
+    'notification_concurrency_b',
+    'host=host.docker.internal port=54322 dbname=postgres user=postgres password=postgres connect_timeout=3'
+  ),
+  'OK'::text,
+  'second concurrency connection opens'
+);
+
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_concurrency_a',
+      $remote$
+        delete from auth.users
+        where id in (
+          '40000000-0000-4000-8000-000000000001',
+          '50000000-0000-4000-8000-000000000001',
+          '60000000-0000-4000-8000-000000000001'
+        )
+      $remote$
+    )
+  $test$,
+  'stale committed concurrency fixtures are removed before setup'
+);
+
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_concurrency_a',
+      $remote$
+        insert into auth.users (
+          instance_id,
+          id,
+          aud,
+          role,
+          email,
+          encrypted_password,
+          email_confirmed_at,
+          raw_app_meta_data,
+          raw_user_meta_data,
+          created_at,
+          updated_at
+        )
+        values
+          (
+            '00000000-0000-0000-0000-000000000000',
+            '40000000-0000-4000-8000-000000000001',
+            'authenticated',
+            'authenticated',
+            'notification-concurrency@umd.edu',
+            '',
+            now(),
+            '{"provider":"google","providers":["google"]}'::jsonb,
+            '{"full_name":"Notification Concurrency"}'::jsonb,
+            now(),
+            now()
+          ),
+          (
+            '00000000-0000-0000-0000-000000000000',
+            '50000000-0000-4000-8000-000000000001',
+            'authenticated',
+            'authenticated',
+            'transfer-old-owner@umd.edu',
+            '',
+            now(),
+            '{"provider":"google","providers":["google"]}'::jsonb,
+            '{"full_name":"Transfer Old"}'::jsonb,
+            now(),
+            now()
+          ),
+          (
+            '00000000-0000-0000-0000-000000000000',
+            '60000000-0000-4000-8000-000000000001',
+            'authenticated',
+            'authenticated',
+            'transfer-new-owner@umd.edu',
+            '',
+            now(),
+            '{"provider":"google","providers":["google"]}'::jsonb,
+            '{"full_name":"Transfer New"}'::jsonb,
+            now(),
+            now()
+          );
+
+        insert into public.notifications (
+          id, user_id, type, category, title, body, url, dedupe_key
+        )
+        values (
+          '50000000-0000-4000-8000-000000000002',
+          '50000000-0000-4000-8000-000000000001',
+          'chat_message',
+          'chat',
+          'Transfer audit notification',
+          'Delivery audit must survive endpoint transfer.',
+          '/app',
+          'fixture:concurrency:transfer-audit'
+        );
+
+        insert into public.push_subscriptions (
+          id, user_id, endpoint, p256dh, auth, user_agent
+        )
+        values (
+          '50000000-0000-4000-8000-000000000003',
+          '50000000-0000-4000-8000-000000000001',
+          'https://fcm.googleapis.com/fcm/send/concurrency-transfer',
+          'concurrency-transfer-p256dh',
+          'concurrency-transfer-auth',
+          'old concurrency browser'
+        );
+
+        insert into public.notification_deliveries (
+          id, notification_id, subscription_id, user_id
+        )
+        values (
+          '50000000-0000-4000-8000-000000000004',
+          '50000000-0000-4000-8000-000000000002',
+          '50000000-0000-4000-8000-000000000003',
+          '50000000-0000-4000-8000-000000000001'
+        );
+      $remote$
+    )
+  $test$,
+  'committed concurrency fixtures are created outside the pgTAP transaction'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_concurrency_a',
+      'begin; set local statement_timeout = ''5s''; set local lock_timeout = ''3s'''
+    )
+  $$,
+  'first notification transaction starts with bounded timeouts'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_concurrency_b',
+      'begin; set local statement_timeout = ''5s''; set local lock_timeout = ''3s'''
+    )
+  $$,
+  'second notification transaction starts with bounded timeouts'
+);
+
+select lives_ok(
+  $test$
+    select *
+    from extensions.dblink(
+      'notification_concurrency_a',
+      $remote$
+        select (
+          public.create_notification(
+            '40000000-0000-4000-8000-000000000001',
+            'chat_message',
+            'Concurrent message',
+            'First concurrent body',
+            '/app',
+            '{"source":"first"}'::jsonb,
+            'fixture:concurrency:same-dedupe',
+            '2026-08-04 12:00:00+00'::timestamptz,
+            false
+          )
+        ).id
+      $remote$
+    ) as created(id uuid)
+  $test$,
+  'first transaction creates the deduplicated notification while holding its lock'
+);
+
+select is(
+  extensions.dblink_send_query(
+    'notification_concurrency_b',
+    $remote$
+      select (
+        public.create_notification(
+          '40000000-0000-4000-8000-000000000001',
+          'chat_message',
+          'Concurrent message duplicate',
+          'Second concurrent body',
+          '/app',
+          '{"source":"second"}'::jsonb,
+          'fixture:concurrency:same-dedupe',
+          '2026-08-04 12:00:01+00'::timestamptz,
+          false
+        )
+      ).id
+    $remote$
+  ),
+  1,
+  'second concurrent notification request is dispatched asynchronously'
+);
+
+select is(
+  extensions.dblink_is_busy('notification_concurrency_b'),
+  1,
+  'second notification request waits on the first transaction lock'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_concurrency_a', 'commit')$$,
+  'first notification transaction commits and releases its lock'
+);
+
+select lives_ok(
+  $$
+    select *
+    from extensions.dblink_get_result('notification_concurrency_b')
+      as created(id uuid)
+  $$,
+  'second notification request completes after the first commit'
+);
+
+select is(
+  (
+    select count(*)
+    from extensions.dblink_get_result('notification_concurrency_b')
+      as drained(id uuid)
+  ),
+  0::bigint,
+  'second notification connection drains its asynchronous result'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_concurrency_b', 'commit')$$,
+  'second notification transaction commits'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from public.notifications
+    where user_id = '40000000-0000-4000-8000-000000000001'
+      and dedupe_key = 'fixture:concurrency:same-dedupe'
+  $$,
+  $$values (1)$$,
+  'simultaneous same-user same-dedupe creation leaves one notification'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_concurrency_a',
+      'begin; set local statement_timeout = ''5s''; set local lock_timeout = ''3s'''
+    )
+  $$,
+  'first transfer transaction starts with bounded timeouts'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_concurrency_b',
+      'begin; set local statement_timeout = ''5s''; set local lock_timeout = ''3s'''
+    )
+  $$,
+  'second transfer transaction starts with bounded timeouts'
+);
+
+select lives_ok(
+  $test$
+    select *
+    from extensions.dblink(
+      'notification_concurrency_a',
+      $remote$
+        select set_config(
+          'request.jwt.claim.sub',
+          '60000000-0000-4000-8000-000000000001',
+          true
+        )
+      $remote$
+    ) as configured(value text)
+  $test$,
+  'first transfer transaction receives the new owner auth claim'
+);
+
+select lives_ok(
+  $test$
+    select *
+    from extensions.dblink(
+      'notification_concurrency_b',
+      $remote$
+        select set_config(
+          'request.jwt.claim.sub',
+          '60000000-0000-4000-8000-000000000001',
+          true
+        )
+      $remote$
+    ) as configured(value text)
+  $test$,
+  'second transfer transaction receives the new owner auth claim'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_concurrency_a',
+      'set local role authenticated'
+    )
+  $$,
+  'first transfer transaction assumes the authenticated role'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_concurrency_b',
+      'set local role authenticated'
+    )
+  $$,
+  'second transfer transaction assumes the authenticated role'
+);
+
+select lives_ok(
+  $test$
+    select *
+    from extensions.dblink(
+      'notification_concurrency_a',
+      $remote$
+        select (
+          public.save_push_subscription(
+            'https://fcm.googleapis.com/fcm/send/concurrency-transfer',
+            'concurrency-transfer-p256dh',
+            'concurrency-transfer-auth',
+            'new concurrency browser'
+          )
+        ).id
+      $remote$
+    ) as saved(id uuid)
+  $test$,
+  'first endpoint transfer holds the endpoint lock before commit'
+);
+
+select is(
+  extensions.dblink_send_query(
+    'notification_concurrency_b',
+    $remote$
+      select (
+        public.save_push_subscription(
+          'https://fcm.googleapis.com/fcm/send/concurrency-transfer',
+          'concurrency-transfer-p256dh',
+          'concurrency-transfer-auth',
+          'new concurrency browser'
+        )
+      ).id
+    $remote$
+  ),
+  1,
+  'second same-endpoint transfer is dispatched asynchronously'
+);
+
+select is(
+  extensions.dblink_is_busy('notification_concurrency_b'),
+  1,
+  'second same-endpoint transfer waits on the endpoint lock'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_concurrency_a', 'commit')$$,
+  'first endpoint transfer commits and releases its lock'
+);
+
+select lives_ok(
+  $$
+    select *
+    from extensions.dblink_get_result('notification_concurrency_b')
+      as saved(id uuid)
+  $$,
+  'second same-endpoint transfer completes idempotently'
+);
+
+select is(
+  (
+    select count(*)
+    from extensions.dblink_get_result('notification_concurrency_b')
+      as drained(id uuid)
+  ),
+  0::bigint,
+  'second transfer connection drains its asynchronous result'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_concurrency_b', 'commit')$$,
+  'second endpoint transfer transaction commits'
+);
+
+select results_eq(
+  $$
+    select
+      (
+        select count(*)::integer
+        from public.push_subscriptions
+        where endpoint = 'https://fcm.googleapis.com/fcm/send/concurrency-transfer'
+          and user_id = '60000000-0000-4000-8000-000000000001'
+          and disabled_at is null
+      ),
+      (
+        select count(*)::integer
+        from public.push_subscriptions
+        where id = '50000000-0000-4000-8000-000000000003'
+          and user_id = '50000000-0000-4000-8000-000000000001'
+          and endpoint = 'retired:50000000-0000-4000-8000-000000000003'
+          and disabled_at is not null
+      ),
+      (
+        select count(*)::integer
+        from public.notification_deliveries
+        where id = '50000000-0000-4000-8000-000000000004'
+          and subscription_id = '50000000-0000-4000-8000-000000000003'
+          and user_id = '50000000-0000-4000-8000-000000000001'
+      )
+  $$,
+  $$values (1, 1, 1)$$,
+  'simultaneous transfer leaves one active endpoint and preserves old delivery audit'
+);
+
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_concurrency_a',
+      $remote$
+        delete from auth.users
+        where id in (
+          '40000000-0000-4000-8000-000000000001',
+          '50000000-0000-4000-8000-000000000001',
+          '60000000-0000-4000-8000-000000000001'
+        )
+      $remote$
+    )
+  $test$,
+  'committed concurrency fixtures are removed'
+);
+
+select results_eq(
+  $$
+    select
+      (
+        select count(*)::integer
+        from auth.users
+        where id in (
+          '40000000-0000-4000-8000-000000000001',
+          '50000000-0000-4000-8000-000000000001',
+          '60000000-0000-4000-8000-000000000001'
+        )
+      ),
+      (
+        select count(*)::integer
+        from public.notifications
+        where user_id in (
+          '40000000-0000-4000-8000-000000000001',
+          '50000000-0000-4000-8000-000000000001',
+          '60000000-0000-4000-8000-000000000001'
+        )
+      ),
+      (
+        select count(*)::integer
+        from public.push_subscriptions
+        where user_id in (
+          '40000000-0000-4000-8000-000000000001',
+          '50000000-0000-4000-8000-000000000001',
+          '60000000-0000-4000-8000-000000000001'
+        )
+      ),
+      (
+        select count(*)::integer
+        from public.notification_deliveries
+        where user_id in (
+          '40000000-0000-4000-8000-000000000001',
+          '50000000-0000-4000-8000-000000000001',
+          '60000000-0000-4000-8000-000000000001'
+        )
+      )
+  $$,
+  $$values (0, 0, 0, 0)$$,
+  'remote concurrency cleanup leaves no committed fixtures'
+);
+
+select lives_ok(
+  $$select extensions.dblink_disconnect('notification_concurrency_a')$$,
+  'first concurrency connection closes'
+);
+
+select lives_ok(
+  $$select extensions.dblink_disconnect('notification_concurrency_b')$$,
+  'second concurrency connection closes'
 );
 
 select * from finish();
