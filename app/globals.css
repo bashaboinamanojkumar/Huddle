@@ -5,9 +5,9 @@
 
 :root {
   color-scheme: dark;
-  --background: #0f1318;
+  --background: #24344F;
   --foreground: #F7F4EE;
-  --card: #1a1f2e;
+  --card: #2d3f5e;
   --card-foreground: #F7F4EE;
   --popover: #1a1f2e;
   --popover-foreground: #F7F4EE;
@@ -111,15 +111,15 @@
 
   html {
     min-height: 100%;
-    background: #0f1318;
+    background: #24344F;
   }
 
   body {
     min-height: 100%;
     overflow-x: hidden;
     background:
-      radial-gradient(circle at 50% -10%, rgba(116, 128, 220, 0.28), transparent 34rem),
-      radial-gradient(circle at 20% 20%, rgba(6, 182, 212, 0.12), transparent 18rem),
+      radial-gradient(circle at 50% -10%, rgba(131, 142, 223, 0.20), transparent 34rem),
+      radial-gradient(circle at 20% 20%, rgba(95, 121, 226, 0.10), transparent 18rem),
       var(--background);
     color: var(--foreground);
   }
