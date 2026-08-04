@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import { ActivityCard } from "@/components/huddle/activity-card"
 import { useHuddle } from "@/lib/store/huddle-store"
 import { formatActivityDate, formatActivityTime } from "@/lib/format"
+import { HuddleWordmark } from "@/components/huddle/huddle-icons"
 
 export default function FeedPage() {
   const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend, refresh } = useHuddle()
@@ -97,7 +98,7 @@ export default function FeedPage() {
           <div>
             <div className="flex items-center gap-3 mb-2">
               <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">Huddle</p>
+              <HuddleWordmark className="text-white text-lg" />
             </div>
             <h1 className="font-heading text-3xl font-black leading-none text-white">
               Hey, {currentProfile.firstName} 👋

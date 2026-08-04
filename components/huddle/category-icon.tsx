@@ -1,31 +1,23 @@
-import {
-  BookOpen,
-  Coffee,
-  Dumbbell,
-  Gamepad2,
-  HeartHandshake,
-  Languages,
-  Music,
-  Smile,
-  Sparkles,
-  Trees,
-  Trophy,
-} from "lucide-react"
 import type { Category } from "@/lib/types/huddle"
+import {
+  StudyIcon, CoffeeIcon, WalksIcon, FitnessIcon,
+  GamesIcon, ArtsIcon, FaithIcon, LanguageIcon,
+  ServiceIcon, HangoutIcon, SportsIcon
+} from "@/components/huddle/huddle-icons"
 
 const iconMap = {
-  study: BookOpen,
-  coffee: Coffee,
-  outdoors: Trees,
-  fitness: Dumbbell,
-  games: Gamepad2,
-  arts: Music,
-  faith: Sparkles,
-  language: Languages,
-  volunteering: HeartHandshake,
-  hangout: Smile,
-  sports: Trophy,
-} satisfies Record<Category, typeof BookOpen>
+  study: StudyIcon,
+  coffee: CoffeeIcon,
+  outdoors: WalksIcon,
+  fitness: FitnessIcon,
+  games: GamesIcon,
+  arts: ArtsIcon,
+  faith: FaithIcon,
+  language: LanguageIcon,
+  volunteering: ServiceIcon,
+  hangout: HangoutIcon,
+  sports: SportsIcon,
+} satisfies Record<Category, React.ComponentType<{ className?: string }>>
 
 export function CategoryIcon({ category, className }: { category: Category; className?: string }) {
   const Icon = iconMap[category]
