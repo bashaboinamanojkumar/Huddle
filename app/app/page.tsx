@@ -97,8 +97,10 @@ export default function FeedPage() {
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
-              <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
-              <HuddleWordmark className="text-white text-lg" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
+                <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
+              </div>
+              <HuddleWordmark className="text-white text-xl" />
             </div>
             <h1 className="font-heading text-3xl font-black leading-none text-white">
               Hey, {currentProfile.firstName} 👋
