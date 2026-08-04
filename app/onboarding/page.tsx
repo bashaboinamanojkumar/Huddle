@@ -133,9 +133,7 @@ export default function OnboardingPage() {
             <p className="text-xs uppercase tracking-[0.2em] text-secondary">Huddle setup</p>
             <h1 className="mt-1 font-heading text-2xl font-black text-white">Build your activity fit</h1>
           </div>
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
-            <Sparkles className="h-5 w-5 text-secondary" />
-          </div>
+          <img src="/huddle-icon.png" alt="Huddle" className="h-12 w-12 object-contain" />
         </div>
 
         <div className="mt-5 flex gap-2">

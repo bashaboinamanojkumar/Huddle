@@ -169,6 +169,15 @@
   padding-top: 1.25rem;
 }
 
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 @supports (-webkit-touch-callout: none) {
   .ios-safe-pt {
     padding-top: max(3rem, env(safe-area-inset-top));

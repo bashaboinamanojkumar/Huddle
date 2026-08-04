@@ -9,15 +9,18 @@ export default function LandingPage() {
           <div className="absolute -right-16 top-8 h-40 w-40 rounded-full bg-white/15 blur-3xl" />
           <div className="absolute -left-20 bottom-0 h-44 w-44 rounded-full bg-black/30 blur-3xl" />
           <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-white/16 px-3 py-1 text-xs font-semibold text-white">
-              <Sparkles className="h-3.5 w-3.5" />
-              University of Maryland pilot for real-life meetups
+            <div className="flex items-center gap-3 mb-2">
+              <img src="/huddle-icon.png" alt="Huddle" className="h-12 w-12 object-contain" />
+              <div className="inline-flex items-center gap-2 rounded-full bg-white/16 px-3 py-1 text-xs font-semibold text-white">
+                <Sparkles className="h-3.5 w-3.5" />
+                University of Maryland pilot
+              </div>
             </div>
-            <h1 className="mt-8 font-heading text-5xl font-black leading-[0.95] tracking-tight text-white">
-              Find your next small group.
+            <h1 className="mt-6 font-heading text-5xl font-black leading-[0.95] tracking-tight text-white">
+              Find your people. Huddle up.
             </h1>
             <p className="mt-4 max-w-xs text-sm leading-6 text-white/76">
-              Huddle helps university students join low-pressure public activities with limited seats, shared interests, and safer meet-points.
+              Low-pressure events, shared interests, and safer meet-points — built for university students who want real connections.
             </p>
             <Link
               href="/verify"

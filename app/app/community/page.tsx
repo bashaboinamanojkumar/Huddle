@@ -94,31 +94,8 @@ export default function CommunityPage() {
       </header>
 
       <section className="px-5 py-5">
-        <div className="flex gap-2 overflow-x-auto pb-2">
-          <button
-            type="button"
-            onClick={() => setCategory("all")}
-            className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-              category === "all" ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/62"
-            }`}
-          >
-            All
-          </button>
-          {categoryMeta.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => setCategory(item.id)}
-              className={`shrink-0 rounded-full px-4 py-2 text-xs font-bold ${
-                category === item.id ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/62"
-              }`}
-            >
-              {item.shortLabel}
-            </button>
-          ))}
-        </div>
 
-        <div className="mt-2 flex gap-2 overflow-x-auto pb-2">
+        <div className="mt-2 flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
           <button
             type="button"
             onClick={() => setDate("all")}
@@ -151,7 +128,21 @@ export default function CommunityPage() {
         </div>
         <div className="mt-4">
           <h2 className="font-heading text-lg font-black text-white mb-3">Explore by category</h2>
-          <div className="flex gap-3 overflow-x-auto pb-2">
+          <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
+            
+            <button
+              type="button"
+              onClick={() => setCategory("all")}
+              className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
+                category === "all"
+                  ? "border-secondary bg-secondary/18"
+                  : "border-white/10 bg-white/6"
+              }`}
+            >
+              <span className="text-2xl">✦</span>
+              <span className="text-[11px] font-bold text-white text-center leading-tight">All</span>
+              <span className="text-[10px] text-white/40">{approvedActivities.length} events</span>
+            </button>
             {categoryMeta.map((item) => (
               <button
                 key={item.id}
