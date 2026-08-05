@@ -7,6 +7,7 @@ export default [
       ".next/**",
       "node_modules/**",
       "public/sw.js",
+      "supabase/functions/**",
       "_docx_extracted.xml",
       "**/*.docx",
     ],
