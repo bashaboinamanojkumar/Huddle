@@ -53,11 +53,25 @@ support exports, or screenshots.
 ```sql
 select jobid, jobname, schedule, active
 from cron.job
-where jobname like 'huddle-notification-%'
+where jobname in (
+  'huddle-notification-delivery-retry',
+  'huddle-notification-cleanup',
+  'huddle-event-reminders',
+  'huddle-pulse-prompts',
+  'huddle-activity-match-digests',
+  'huddle-weekly-recaps'
+)
 order by jobname;
 
 select public.request_push_dispatch();
 select public.notification_operations_summary();
+
+-- Manual producer smoke calls. Repeating a call should move created counts
+-- to deduped counts without adding another inbox row.
+select * from public.produce_event_reminders();
+select * from public.produce_pulse_prompts();
+select * from public.produce_activity_match_digests();
+select * from public.produce_weekly_recaps();
 
 select notification_core_enabled, push_enabled, rewards_enabled,
        push_rollout_percentage
@@ -65,9 +79,19 @@ from public.notification_runtime_config
 where id;
 ```
 
-Expected jobs are `huddle-notification-delivery-retry` every minute and
-`huddle-notification-cleanup` at `08:20 UTC` daily. The operations summary is
-restricted to validated safety owners and contains aggregates/error codes only.
+Expected delivery jobs are `huddle-notification-delivery-retry` every minute
+and `huddle-notification-cleanup` at `08:20 UTC` daily. Event reminders run
+every five minutes, pulse prompts every fifteen minutes, and both digest gates
+run hourly. The digest functions act only at `17:00 America/New_York`; weekly
+recaps act only Monday at `09:00 America/New_York`, so EST/EDT changes need no
+cron rewrite.
+
+Producer results are `{scanned, created, deduped, failed, skipped}`. A healthy
+rerun has the same `scanned` count, zero `created`, and the prior created count
+under `deduped`. `skipped` means no eligible content for a scanned user;
+`failed` means one isolated recipient write failed and needs investigation.
+The operations summary is restricted to validated safety owners and contains
+aggregates/error codes only.
 
 ## Rollout and kill switch
 
@@ -110,4 +134,3 @@ appears in Push or logs.
 
 Live Web Push remains pending until the linked production project, Vercel
 deployment, and real devices have completed this checklist.
-

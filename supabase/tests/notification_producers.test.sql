@@ -639,6 +639,218 @@ select lives_ok(
   'second concurrent promotion worker disconnects'
 );
 
+-- Scheduled fixtures are anchored so every producer window is deterministic.
+update public.profiles
+set completed_onboarding = true,
+    interests = array['coffee']::public.category[],
+    availability_blocks = array['weekday_afternoon']::public.availability_block[],
+    comfort_size = 'either',
+    safety_preference = 'none'
+where id = '81000000-0000-4000-8000-000000000008';
+
+insert into public.activities (
+  id, title, category, location_id, host_id, capacity, start_time,
+  availability_block, source, status, university_id, comfort_size,
+  safety_preference, created_at, updated_at
+)
+values
+  (
+    '89000000-0000-4000-8000-000000000001', 'Reminder Window', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000001',
+    6, '2026-08-05 12:02:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umd', 'either', 'none', '2026-08-01 12:00:00+00', '2026-08-01 12:00:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000002', 'Pulse Window', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000001',
+    6, '2026-08-04 10:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umd', 'either', 'none', '2026-08-01 12:00:00+00', '2026-08-01 12:00:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000003', 'Current Match', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000006',
+    6, '2026-08-06 17:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umb', 'either', 'none', '2026-08-04 20:00:00+00', '2026-08-04 20:00:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000004', 'Already Joined Match', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000006',
+    6, '2026-08-06 18:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umb', 'either', 'none', '2026-08-04 20:10:00+00', '2026-08-04 20:10:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000005', 'Stale Match', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000006',
+    6, '2026-08-06 19:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umb', 'either', 'none', '2026-08-02 20:00:00+00', '2026-08-02 20:00:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000006', 'Winter DST Match', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000006',
+    6, '2026-01-16 17:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umb', 'either', 'none', '2026-01-15 21:30:00+00', '2026-01-15 21:30:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000007', 'Summer DST Match', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000006',
+    6, '2026-07-16 17:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umb', 'either', 'none', '2026-07-15 20:30:00+00', '2026-07-15 20:30:00+00'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000008', 'Weekly Completed Huddle', 'coffee',
+    'notification-producer-fixture', '81000000-0000-4000-8000-000000000006',
+    6, '2026-07-30 17:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    'umb', 'either', 'none', '2026-07-25 20:00:00+00', '2026-07-25 20:00:00+00'
+  );
+
+insert into public.rsvps (activity_id, user_id, status, created_at, updated_at)
+values
+  ('89000000-0000-4000-8000-000000000001','81000000-0000-4000-8000-000000000002','going','2026-08-01 12:00:00+00','2026-08-01 12:00:00+00'),
+  ('89000000-0000-4000-8000-000000000001','81000000-0000-4000-8000-000000000003','going','2026-08-01 12:00:01+00','2026-08-01 12:00:01+00'),
+  ('89000000-0000-4000-8000-000000000002','81000000-0000-4000-8000-000000000002','going','2026-08-01 12:00:00+00','2026-08-01 12:00:00+00'),
+  ('89000000-0000-4000-8000-000000000004','81000000-0000-4000-8000-000000000008','going','2026-08-04 20:15:00+00','2026-08-04 20:15:00+00'),
+  ('89000000-0000-4000-8000-000000000008','81000000-0000-4000-8000-000000000008','going','2026-07-28 12:00:00+00','2026-07-28 12:00:00+00');
+
+select results_eq(
+  $$select * from public.produce_event_reminders('2026-08-04 12:00:00+00')$$,
+  $$values (2, 2, 0, 0, 0)$$,
+  'the 24-hour reminder scans and creates once per going attendee'
+);
+select results_eq(
+  $$select * from public.produce_event_reminders('2026-08-04 12:00:00+00')$$,
+  $$values (2, 0, 2, 0, 0)$$,
+  'rerunning the same reminder window reports deduped rows'
+);
+select results_eq(
+  $$select * from public.produce_event_reminders('2026-08-05 11:00:00+00')$$,
+  $$values (2, 2, 0, 0, 0)$$,
+  'the slightly wider five-minute one-hour window cannot miss attendees'
+);
+
+select results_eq(
+  $$select * from public.produce_pulse_prompts('2026-08-04 12:05:00+00')$$,
+  $$values (1, 1, 0, 0, 0)$$,
+  'the fifteen-minute post-event pulse window targets going attendees'
+);
+select results_eq(
+  $$select * from public.produce_pulse_prompts('2026-08-04 12:05:00+00')$$,
+  $$values (1, 0, 1, 0, 0)$$,
+  'pulse prompt reruns are idempotent'
+);
+
+select results_eq(
+  $$select * from public.produce_activity_match_digests('2026-08-04 20:00:00+00')$$,
+  $$values (0, 0, 0, 0, 0)$$,
+  'daily matching stays closed before 17:00 New York time'
+);
+select results_eq(
+  $$select * from public.produce_activity_match_digests('2026-08-04 21:00:00+00')$$,
+  $$values (1, 1, 0, 0, 0)$$,
+  'daily matching creates one digest and excludes joined stale and wrong-university activities'
+);
+select results_eq(
+  $$
+    select (data ->> 'matchCount')::integer
+    from public.notifications
+    where user_id = '81000000-0000-4000-8000-000000000008'
+      and dedupe_key = 'activity-match:81000000-0000-4000-8000-000000000008:2026-08-04'
+  $$,
+  $$values (1)$$,
+  'the daily digest summarizes only eligible activities from the prior window'
+);
+select results_eq(
+  $$select * from public.produce_activity_match_digests('2026-08-04 21:00:00+00')$$,
+  $$values (1, 0, 1, 0, 0)$$,
+  'daily digest reruns report their deduped row'
+);
+
+select results_eq(
+  $$select * from public.produce_activity_match_digests('2026-01-15 21:00:00+00')$$,
+  $$values (0, 0, 0, 0, 0)$$,
+  'the winter gate does not run at 16:00 EST'
+);
+select results_eq(
+  $$select * from public.produce_activity_match_digests('2026-01-15 22:00:00+00')$$,
+  $$values (1, 1, 0, 0, 0)$$,
+  'the winter gate runs at 17:00 EST'
+);
+select results_eq(
+  $$select * from public.produce_activity_match_digests('2026-07-15 21:00:00+00')$$,
+  $$values (1, 1, 0, 0, 0)$$,
+  'the summer gate runs at 17:00 EDT without a cron rewrite'
+);
+
+select results_eq(
+  $$select * from public.produce_weekly_recaps('2026-08-03 12:00:00+00')$$,
+  $$values (0, 0, 0, 0, 0)$$,
+  'the Monday recap stays closed before 09:00 New York time'
+);
+select results_eq(
+  $$select * from public.produce_weekly_recaps('2026-08-03 13:00:00+00')$$,
+  $$values (1, 1, 0, 0, 0)$$,
+  'the Monday 09:00 EDT recap summarizes completed Huddles'
+);
+select results_eq(
+  $$select * from public.produce_weekly_recaps('2026-08-03 13:00:00+00')$$,
+  $$values (1, 0, 1, 0, 0)$$,
+  'weekly recap reruns report their deduped row'
+);
+
+select results_eq(
+  $$
+    select total, eligible
+    from public.activity_match_score(
+      '81000000-0000-4000-8000-000000000008',
+      '89000000-0000-4000-8000-000000000003'
+    )
+  $$,
+  $$values (100, true)$$,
+  'SQL match scoring mirrors exact interest availability and comfort weights'
+);
+select results_eq(
+  $$
+    select total, eligible
+    from public.activity_match_score(
+      '81000000-0000-4000-8000-000000000008',
+      '89000000-0000-4000-8000-000000000004'
+    )
+  $$,
+  $$values (100, false)$$,
+  'match scoring preserves score while excluding an activity already joined'
+);
+select results_eq(
+  $$
+    select total, eligible
+    from public.activity_match_score(
+      '81000000-0000-4000-8000-000000000001',
+      '82000000-0000-4000-8000-000000000001'
+    )
+  $$,
+  $$values (100, true)$$,
+  'the public score wrapper keeps a non-joined host eligible'
+);
+
+select results_eq(
+  $$
+    select jobname, count(*)::integer
+    from cron.job
+    where jobname in (
+      'huddle-event-reminders', 'huddle-pulse-prompts',
+      'huddle-activity-match-digests', 'huddle-weekly-recaps'
+    )
+    group by jobname
+    order by jobname
+  $$,
+  $$
+    values
+      ('huddle-activity-match-digests'::text, 1),
+      ('huddle-event-reminders'::text, 1),
+      ('huddle-pulse-prompts'::text, 1),
+      ('huddle-weekly-recaps'::text, 1)
+  $$,
+  'all four producer schedules are installed exactly once'
+);
+
 select results_eq(
   $$
     select count(*)::integer
