@@ -4,6 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { CalendarHeart, MessageCircle, Plus, Trophy, UserRound } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useNotifications } from "@/lib/notifications/notification-provider"
 
 const tabs = [
   { href: "/app", label: "Feed", icon: CalendarHeart },
@@ -15,6 +16,7 @@ const tabs = [
 
 export function BottomNav() {
   const pathname = usePathname()
+  const { unreadChatCount } = useNotifications()
 
   return (
     <nav className="safe-pb sticky bottom-0 z-40 border-t border-white/10 bg-black/75 px-3 pt-2 backdrop-blur-xl">
@@ -43,7 +45,15 @@ export function BottomNav() {
                 active ? "text-secondary" : "text-white/54 hover:text-white"
               )}
             >
-              <Icon className={cn("h-5 w-5", active && "fill-secondary/20")} />
+              <span className="relative">
+                <Icon className={cn("h-5 w-5", active && "fill-secondary/20")} />
+                {tab.href === "/app/chats" && unreadChatCount > 0 && (
+                  <span
+                    aria-label="Unread chats"
+                    className="absolute -right-1.5 -top-1 h-2.5 w-2.5 rounded-full border border-black bg-coral"
+                  />
+                )}
+              </span>
               <span>{tab.label}</span>
             </Link>
           )
