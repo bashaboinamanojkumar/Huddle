@@ -1,6 +1,7 @@
 begin;
 
 create extension if not exists pgtap with schema extensions;
+create extension if not exists dblink with schema extensions;
 set local search_path = public, extensions, auth;
 
 select no_plan();
@@ -77,13 +78,6 @@ values
     5, '2026-08-09 17:00:00+00', 'weekday_afternoon', 'user', 'pending',
     'umd', '2026-08-04 12:00:00+00', '2026-08-04 12:00:00+00'
   );
-
--- Two devices prove producer inserts flow through the durable delivery outbox.
-update public.notification_runtime_config
-set notification_core_enabled = true,
-    push_enabled = true,
-    push_rollout_percentage = 100
-where id;
 
 insert into public.push_subscriptions (id, user_id, endpoint, p256dh, auth, created_at, updated_at, last_seen_at)
 values
@@ -275,15 +269,13 @@ select results_eq(
 
 select results_eq(
   $$
-    select count(*)::integer,
-           (select count(*)::integer from public.notification_deliveries d where d.notification_id = n.id)
+    select count(*)::integer
     from public.notifications n
     where n.user_id = '81000000-0000-4000-8000-000000000004'
       and n.dedupe_key = 'waitlist-promoted:82000000-0000-4000-8000-000000000003:81000000-0000-4000-8000-000000000004'
-    group by n.id
   $$,
-  $$values (1, 2)$$,
-  'waitlist promotion creates one inbox row and one delivery per active device'
+  $$values (1)$$,
+  'waitlist promotion creates one durable inbox row'
 );
 
 -- Review is transition-based: repeated review calls do not produce a second row.
@@ -419,6 +411,232 @@ select results_eq(
   $$,
   $$values (0)$$,
   'safety context is absent from every notification body and data object'
+);
+
+-- Two independent database sessions leaving the same full activity must not
+-- deadlock, oversubscribe, skip the queue, or duplicate promotion messages.
+select lives_ok(
+  $$
+    select extensions.dblink_connect(
+      'notification_promotion_a',
+      'host=host.docker.internal port=54322 dbname=postgres user=postgres password=postgres connect_timeout=3'
+    )
+  $$,
+  'first concurrent promotion worker connects'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_connect(
+      'notification_promotion_b',
+      'host=host.docker.internal port=54322 dbname=postgres user=postgres password=postgres connect_timeout=3'
+    )
+  $$,
+  'second concurrent promotion worker connects'
+);
+
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_promotion_a',
+      $remote$
+        insert into auth.users (
+          instance_id, id, aud, role, email, encrypted_password,
+          email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+          created_at, updated_at
+        )
+        select
+          '00000000-0000-0000-0000-000000000000'::uuid,
+          fixture.id,
+          'authenticated', 'authenticated', fixture.email, '', now(),
+          '{}'::jsonb, jsonb_build_object('full_name', fixture.full_name), now(), now()
+        from (values
+          ('87000000-0000-4000-8000-000000000001'::uuid, 'race-host@umd.edu', 'Race Host'),
+          ('87000000-0000-4000-8000-000000000002'::uuid, 'race-leaver-a@umd.edu', 'Race Leaver A'),
+          ('87000000-0000-4000-8000-000000000003'::uuid, 'race-leaver-b@umd.edu', 'Race Leaver B'),
+          ('87000000-0000-4000-8000-000000000004'::uuid, 'race-waiter-a@umd.edu', 'Race Waiter A'),
+          ('87000000-0000-4000-8000-000000000005'::uuid, 'race-waiter-b@umd.edu', 'Race Waiter B')
+        ) as fixture(id, email, full_name);
+
+        insert into public.locations (id, university_id, name, area, safety_note)
+        values ('notification-promotion-race', 'umd', 'Promotion Race', 'Campus', 'Public fixture.');
+
+        insert into public.activities (
+          id, title, category, location_id, host_id, capacity, start_time,
+          availability_block, source, status, university_id
+        ) values (
+          '88000000-0000-4000-8000-000000000001', 'Concurrent Queue', 'coffee',
+          'notification-promotion-race', '87000000-0000-4000-8000-000000000001',
+          2, now() + interval '2 days', 'weekday_afternoon', 'seeded', 'approved', 'umd'
+        );
+
+        insert into public.rsvps (activity_id, user_id, status, created_at)
+        values
+          ('88000000-0000-4000-8000-000000000001','87000000-0000-4000-8000-000000000002','going','2026-08-04 12:00:00+00'),
+          ('88000000-0000-4000-8000-000000000001','87000000-0000-4000-8000-000000000003','going','2026-08-04 12:00:01+00'),
+          ('88000000-0000-4000-8000-000000000001','87000000-0000-4000-8000-000000000004','waitlisted','2026-08-04 12:00:02+00'),
+          ('88000000-0000-4000-8000-000000000001','87000000-0000-4000-8000-000000000005','waitlisted','2026-08-04 12:00:03+00');
+
+        update public.notification_runtime_config
+        set notification_core_enabled = true,
+            push_enabled = true,
+            push_rollout_percentage = 100
+        where id;
+
+        insert into public.push_subscriptions (user_id, endpoint, p256dh, auth)
+        values
+          ('87000000-0000-4000-8000-000000000004','https://push.example.test/promotion-race/a','race-a','auth-a'),
+          ('87000000-0000-4000-8000-000000000005','https://push.example.test/promotion-race/b','race-b','auth-b')
+      $remote$
+    )
+  $test$,
+  'committed concurrent promotion fixtures are created'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_promotion_a', 'set role authenticated')$$,
+  'first worker assumes the authenticated role'
+);
+select lives_ok(
+  $$select extensions.dblink_exec('notification_promotion_b', 'set role authenticated')$$,
+  'second worker assumes the authenticated role'
+);
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_promotion_a',
+      'set request.jwt.claim.sub = ''87000000-0000-4000-8000-000000000002'''
+    )
+  $$,
+  'first worker receives its JWT subject'
+);
+select lives_ok(
+  $$
+    select extensions.dblink_exec(
+      'notification_promotion_b',
+      'set request.jwt.claim.sub = ''87000000-0000-4000-8000-000000000003'''
+    )
+  $$,
+  'second worker receives its JWT subject'
+);
+
+select is(
+  extensions.dblink_send_query(
+    'notification_promotion_a',
+    $$select public.leave_activity('88000000-0000-4000-8000-000000000001')$$
+  ),
+  1,
+  'first leave is dispatched asynchronously'
+);
+select is(
+  extensions.dblink_send_query(
+    'notification_promotion_b',
+    $$select public.leave_activity('88000000-0000-4000-8000-000000000001')$$
+  ),
+  1,
+  'second leave is dispatched while the first holds the activity lock'
+);
+
+select is(
+  (
+    select count(*)
+    from extensions.dblink_get_result('notification_promotion_a') as result(value text)
+  ),
+  1::bigint,
+  'first concurrent leave completes and its result is fully consumed'
+);
+select is(
+  (
+    select count(*)
+    from extensions.dblink_get_result('notification_promotion_b') as result(value text)
+  ),
+  1::bigint,
+  'second concurrent leave completes without deadlock and is fully consumed'
+);
+
+-- libpq exposes a final empty result marker for an asynchronous command. Drain
+-- it before reusing either named connection for fixture cleanup.
+select is(
+  (
+    select count(*)
+    from extensions.dblink_get_result('notification_promotion_a') as result(value text)
+  ),
+  0::bigint,
+  'first async connection is fully drained'
+);
+select is(
+  (
+    select count(*)
+    from extensions.dblink_get_result('notification_promotion_b') as result(value text)
+  ),
+  0::bigint,
+  'second async connection is fully drained'
+);
+
+select results_eq(
+  $$
+    select user_id, status::text
+    from public.rsvps
+    where activity_id = '88000000-0000-4000-8000-000000000001'
+    order by created_at, user_id
+  $$,
+  $$
+    values
+      ('87000000-0000-4000-8000-000000000002'::uuid, 'left'::text),
+      ('87000000-0000-4000-8000-000000000003'::uuid, 'left'::text),
+      ('87000000-0000-4000-8000-000000000004'::uuid, 'going'::text),
+      ('87000000-0000-4000-8000-000000000005'::uuid, 'going'::text)
+  $$,
+  'concurrent leaves promote both waiters once in committed queue order'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer,
+           count(distinct n.user_id)::integer,
+           count(d.id)::integer
+    from public.notifications n
+    left join public.notification_deliveries d on d.notification_id = n.id
+    where n.type = 'waitlist_promoted'
+      and n.user_id in (
+        '87000000-0000-4000-8000-000000000004',
+        '87000000-0000-4000-8000-000000000005'
+      )
+  $$,
+  $$values (2, 2, 2)$$,
+  'each concurrently promoted waiter gets one inbox row and one device delivery'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_promotion_a', 'reset role')$$,
+  'fixture worker restores its database role'
+);
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_promotion_a',
+      $remote$
+        delete from auth.users where id in (
+          '87000000-0000-4000-8000-000000000001',
+          '87000000-0000-4000-8000-000000000002',
+          '87000000-0000-4000-8000-000000000003',
+          '87000000-0000-4000-8000-000000000004',
+          '87000000-0000-4000-8000-000000000005'
+        );
+        delete from public.locations where id = 'notification-promotion-race';
+        update public.notification_runtime_config set push_rollout_percentage = 0 where id
+      $remote$
+    )
+  $test$,
+  'committed concurrent promotion fixtures are removed'
+);
+select lives_ok(
+  $$select extensions.dblink_disconnect('notification_promotion_a')$$,
+  'first concurrent promotion worker disconnects'
+);
+select lives_ok(
+  $$select extensions.dblink_disconnect('notification_promotion_b')$$,
+  'second concurrent promotion worker disconnects'
 );
 
 select results_eq(
