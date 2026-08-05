@@ -46,15 +46,23 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
+      <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
+          <div className="flex items-center gap-3">
+            <div
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10"
+              style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
+            >
+              <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
                 {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
-            </p>
-            <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
-              All events
-            </h1>
+              </p>
+              <h1 className="font-heading text-xl font-black leading-none text-white">
+                All events
+              </h1>
+            </div>
           </div>
           <Link
             href="/app/profile"
@@ -67,21 +75,21 @@ export default function CommunityPage() {
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{approvedActivities.length}</p>
             <p className="text-[11px] text-white/62">joinable</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.streakDays}</p>
             <p className="text-[11px] text-white/62">day streak</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.points}</p>
             <p className="text-[11px] text-white/62">points</p>
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-black/22 px-4 py-2">
+        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-2">
           <Search className="h-5 w-5 text-white/48" />
           <input
             value={search}
