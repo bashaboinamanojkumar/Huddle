@@ -55,12 +55,6 @@ export default function CommunityPage() {
             </div>
             <HuddleWordmark className="text-white text-lg" />
           </div>
-          <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
-            All events
-          </h1>
-          <p className="mt-1 text-xs text-white/62 uppercase tracking-[0.2em] font-semibold">
-            {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
-          </p>
           <Link
             href="/app/profile"
             className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
@@ -70,6 +64,13 @@ export default function CommunityPage() {
             {currentProfile.displayName.charAt(0)}
           </Link>
         </div>
+
+        <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
+          All events
+        </h1>
+        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
+          {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
+        </p>
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-3xl bg-white/8 p-3">
