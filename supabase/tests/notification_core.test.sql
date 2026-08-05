@@ -92,6 +92,167 @@ select results_eq(
   'notification deliveries have a full subscription cascade index'
 );
 
+-- Delivery claims must remain disjoint even when two workers race. These
+-- fixtures are committed through dblink because this pgTAP file itself runs
+-- inside a transaction that the remote sessions cannot observe.
+create temporary table notification_claim_race_results (
+  worker text primary key,
+  delivery_id uuid not null
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_connect(
+      'notification_claim_race_a',
+      'host=host.docker.internal port=54322 dbname=postgres user=postgres password=postgres connect_timeout=3'
+    )
+  $$,
+  'first delivery claim worker connects'
+);
+
+select lives_ok(
+  $$
+    select extensions.dblink_connect(
+      'notification_claim_race_b',
+      'host=host.docker.internal port=54322 dbname=postgres user=postgres password=postgres connect_timeout=3'
+    )
+  $$,
+  'second delivery claim worker connects'
+);
+
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_claim_race_a',
+      $remote$
+        insert into auth.users (
+          instance_id, id, aud, role, email, encrypted_password,
+          email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+          created_at, updated_at
+        )
+        values (
+          '00000000-0000-0000-0000-000000000000',
+          '71000000-0000-4000-8000-000000000001',
+          'authenticated', 'authenticated', 'claim-race@umd.edu', '', now(),
+          '{"provider":"google","providers":["google"]}'::jsonb,
+          '{"full_name":"Claim Race"}'::jsonb,
+          now(), now()
+        );
+
+        update public.notification_runtime_config
+        set notification_core_enabled = true,
+            push_enabled = true,
+            rewards_enabled = true,
+            push_rollout_percentage = 100
+        where id;
+
+        insert into public.push_subscriptions (
+          id, user_id, endpoint, p256dh, auth
+        )
+        values
+          (
+            '71000000-0000-4000-8000-000000000021',
+            '71000000-0000-4000-8000-000000000001',
+            'https://push.example.test/claim-race/a', 'race-key-a', 'race-auth-a'
+          ),
+          (
+            '71000000-0000-4000-8000-000000000022',
+            '71000000-0000-4000-8000-000000000001',
+            'https://push.example.test/claim-race/b', 'race-key-b', 'race-auth-b'
+          );
+
+        insert into public.notifications (
+          id, user_id, type, category, title, body, url, dedupe_key
+        )
+        values
+          (
+            '71000000-0000-4000-8000-000000000011',
+            '71000000-0000-4000-8000-000000000001',
+            'chat_message', 'chat', 'Race one', 'First race delivery.',
+            '/app/chats/race-one', 'delivery:claim-race:one'
+          ),
+          (
+            '71000000-0000-4000-8000-000000000012',
+            '71000000-0000-4000-8000-000000000001',
+            'chat_message', 'chat', 'Race two', 'Second race delivery.',
+            '/app/chats/race-two', 'delivery:claim-race:two'
+          )
+      $remote$
+    )
+  $test$,
+  'committed delivery claim race fixtures are created'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_claim_race_a', 'begin')$$,
+  'first delivery claim worker begins a transaction'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_claim_race_b', 'begin')$$,
+  'second delivery claim worker begins a transaction'
+);
+
+insert into notification_claim_race_results (worker, delivery_id)
+select 'a', claimed.delivery_id
+from extensions.dblink(
+  'notification_claim_race_a',
+  'select delivery_id from public.claim_notification_deliveries(1, 120)'
+) as claimed(delivery_id uuid);
+
+insert into notification_claim_race_results (worker, delivery_id)
+select 'b', claimed.delivery_id
+from extensions.dblink(
+  'notification_claim_race_b',
+  'select delivery_id from public.claim_notification_deliveries(1, 120)'
+) as claimed(delivery_id uuid);
+
+select results_eq(
+  $$
+    select count(*)::integer, count(distinct delivery_id)::integer
+    from notification_claim_race_results
+  $$,
+  $$values (2, 2)$$,
+  'two concurrent claim workers never receive the same delivery'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_claim_race_a', 'commit')$$,
+  'first delivery claim worker commits'
+);
+
+select lives_ok(
+  $$select extensions.dblink_exec('notification_claim_race_b', 'commit')$$,
+  'second delivery claim worker commits'
+);
+
+select lives_ok(
+  $test$
+    select extensions.dblink_exec(
+      'notification_claim_race_a',
+      $remote$
+        delete from auth.users
+        where id = '71000000-0000-4000-8000-000000000001';
+        update public.notification_runtime_config
+        set push_rollout_percentage = 0,
+            rewards_enabled = false
+        where id
+      $remote$
+    )
+  $test$,
+  'committed delivery claim race fixtures are removed'
+);
+
+select lives_ok(
+  $$select extensions.dblink_disconnect('notification_claim_race_a')$$,
+  'first delivery claim worker disconnects'
+);
+
+select lives_ok(
+  $$select extensions.dblink_disconnect('notification_claim_race_b')$$,
+  'second delivery claim worker disconnects'
+);
+
 insert into auth.users (
   instance_id,
   id,
@@ -170,6 +331,9 @@ select results_eq(
       user_id,
       push_enabled,
       digest_enabled,
+      rewards_enabled,
+      quiet_hours_start,
+      quiet_hours_end,
       timezone,
       daily_push_cap
     from public.notification_preferences
@@ -180,8 +344,11 @@ select results_eq(
       '30000000-0000-4000-8000-000000000009'::uuid,
       true,
       false,
+      false,
+      '22:00'::time,
+      '08:00'::time,
       'America/New_York'::text,
-      10
+      6
     )
   $$,
   'the auth user trigger provisions default notification preferences'
@@ -390,11 +557,11 @@ select results_eq(
       true,
       true,
       false,
-      true,
-      null::time,
-      null::time,
+      false,
+      '22:00'::time,
+      '08:00'::time,
       'America/New_York'::text,
-      10
+      6
     )
   $$,
   'notification preference defaults are internally consistent'
@@ -1611,7 +1778,7 @@ select results_eq(
     from public.notification_preferences
     where user_id = '20000000-0000-4000-8000-000000000001'
   $$,
-  $$values (true, 'America/New_York'::text, 10)$$,
+  $$values (true, 'America/New_York'::text, 6)$$,
   'preference updates cannot change another owner row'
 );
 
@@ -2658,6 +2825,1085 @@ select lives_ok(
 select lives_ok(
   $$select extensions.dblink_disconnect('notification_concurrency_b')$$,
   'second concurrency connection closes'
+);
+
+select results_eq(
+  $$
+    select
+      public.notification_rollout_eligible(
+        '10000000-0000-4000-8000-000000000001', 0
+      ),
+      public.notification_rollout_eligible(
+        '10000000-0000-4000-8000-000000000001', 100
+      ),
+      public.notification_rollout_eligible(
+        '10000000-0000-4000-8000-000000000001', 33
+      ),
+      public.notification_rollout_eligible(
+        '10000000-0000-4000-8000-000000000001', 34
+      ),
+      public.notification_rollout_eligible(
+        '10000000-0000-4000-8000-000000000001', 34
+      )
+  $$,
+  $$values (false, true, false, true, true)$$,
+  'rollout bucketing is deterministic with stable zero hundred and representative boundaries'
+);
+
+select throws_ok(
+  $$
+    select public.notification_rollout_eligible(
+      '10000000-0000-4000-8000-000000000001', 101
+    )
+  $$,
+  '22023'::char(5),
+  'Rollout percentage must be between 0 and 100',
+  'rollout eligibility validates percentage bounds'
+);
+
+select results_eq(
+  $$
+    select public.notification_deliver_after(
+      '2026-08-04 16:00:00+00', 'UTC', null, null
+    )
+    union all
+    select public.notification_deliver_after(
+      '2026-08-04 16:00:00+00', 'UTC', '12:00', '12:00'
+    )
+  $$,
+  $$
+    values
+      ('2026-08-04 16:00:00+00'::timestamptz),
+      ('2026-08-04 16:00:00+00'::timestamptz)
+  $$,
+  'missing or equal quiet hour bounds disable deferral'
+);
+
+select results_eq(
+  $$
+    select public.notification_deliver_after(
+      '2026-08-04 16:00:00+00', 'UTC', '09:00', '17:00'
+    )
+    union all
+    select public.notification_deliver_after(
+      '2026-08-04 18:00:00+00', 'UTC', '09:00', '17:00'
+    )
+  $$,
+  $$
+    values
+      ('2026-08-04 17:00:00+00'::timestamptz),
+      ('2026-08-04 18:00:00+00'::timestamptz)
+  $$,
+  'daytime quiet hours defer only instants inside the interval'
+);
+
+select results_eq(
+  $$
+    select public.notification_deliver_after(
+      '2026-08-04 23:00:00+00', 'UTC', '22:00', '07:00'
+    )
+    union all
+    select public.notification_deliver_after(
+      '2026-08-05 02:00:00+00', 'UTC', '22:00', '07:00'
+    )
+    union all
+    select public.notification_deliver_after(
+      '2026-08-05 12:00:00+00', 'UTC', '22:00', '07:00'
+    )
+  $$,
+  $$
+    values
+      ('2026-08-05 07:00:00+00'::timestamptz),
+      ('2026-08-05 07:00:00+00'::timestamptz),
+      ('2026-08-05 12:00:00+00'::timestamptz)
+  $$,
+  'cross midnight quiet hours handle both sides of local midnight'
+);
+
+select results_eq(
+  $$
+    select public.notification_deliver_after(
+      '2026-03-08 06:45:00+00',
+      'America/New_York',
+      '22:00',
+      '02:30'
+    )
+    union all
+    select public.notification_deliver_after(
+      '2026-11-01 05:15:00+00',
+      'America/New_York',
+      '22:00',
+      '01:30'
+    )
+  $$,
+  $$
+    values
+      ('2026-03-08 07:30:00+00'::timestamptz),
+      ('2026-11-01 06:30:00+00'::timestamptz)
+  $$,
+  'New York spring forward and fall back quiet ends resolve to future real instants'
+);
+
+select throws_ok(
+  $$
+    select public.notification_deliver_after(
+      now(), 'Mars/Olympus_Mons', '22:00', '07:00'
+    )
+  $$,
+  '22023'::char(5),
+  'Unsupported timezone',
+  'quiet hour calculation fails safely for an unsupported timezone'
+);
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '70000000-0000-4000-8000-000000000001',
+  'authenticated', 'authenticated', 'delivery-fixture@umd.edu', '', now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Delivery Fixture"}'::jsonb,
+  now(), now()
+);
+
+update public.notification_runtime_config
+set notification_core_enabled = true,
+    push_enabled = true,
+    rewards_enabled = true,
+    push_rollout_percentage = 100
+where id;
+
+update public.notification_preferences
+set push_enabled = true,
+    chat_enabled = true,
+    activities_enabled = true,
+    reminders_enabled = true,
+    social_enabled = true,
+    safety_enabled = true,
+    digest_enabled = true,
+    rewards_enabled = true,
+    quiet_hours_start = null,
+    quiet_hours_end = null,
+    timezone = 'UTC',
+    daily_push_cap = 50
+where user_id = '70000000-0000-4000-8000-000000000001';
+
+insert into public.push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, disabled_at
+)
+values
+  (
+    '70000000-0000-4000-8000-000000000021',
+    '70000000-0000-4000-8000-000000000001',
+    'https://push.example.test/delivery/device-a', 'delivery-key-a', 'delivery-auth-a', null
+  ),
+  (
+    '70000000-0000-4000-8000-000000000022',
+    '70000000-0000-4000-8000-000000000001',
+    'https://push.example.test/delivery/device-b', 'delivery-key-b', 'delivery-auth-b', null
+  ),
+  (
+    '70000000-0000-4000-8000-000000000023',
+    '70000000-0000-4000-8000-000000000001',
+    'https://push.example.test/delivery/disabled', 'delivery-key-c', 'delivery-auth-c', now()
+  ),
+  (
+    '70000000-0000-4000-8000-000000000024',
+    '70000000-0000-4000-8000-000000000001',
+    'retired:70000000-0000-4000-8000-000000000024', 'retired', 'retired', now()
+  );
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '70000000-0000-4000-8000-000000000001',
+      'chat_message', 'Two devices', 'Deliver this to both active devices.',
+      '/app/chats/two-devices', '{}'::jsonb,
+      'delivery:enqueue:two-device'
+    )
+  $$,
+  'an eligible notification is inserted with its inbox row intact'
+);
+
+select results_eq(
+  $$
+    select
+      (select count(*)::integer from public.notifications
+       where user_id = '70000000-0000-4000-8000-000000000001'
+         and dedupe_key = 'delivery:enqueue:two-device'),
+      (select count(*)::integer from public.notification_deliveries as delivery
+       join public.notifications as notification
+         on notification.id = delivery.notification_id
+       where notification.dedupe_key = 'delivery:enqueue:two-device'),
+      (select count(distinct subscription_id)::integer
+       from public.notification_deliveries as delivery
+       join public.notifications as notification
+         on notification.id = delivery.notification_id
+       where notification.dedupe_key = 'delivery:enqueue:two-device'),
+      (select count(*)::integer from public.notification_deliveries as delivery
+       join public.notifications as notification
+         on notification.id = delivery.notification_id
+       where notification.dedupe_key = 'delivery:enqueue:two-device'
+         and delivery.state = 'pending'),
+      (select count(*)::integer from public.notification_deliveries
+       where subscription_id in (
+         '70000000-0000-4000-8000-000000000023',
+         '70000000-0000-4000-8000-000000000024'
+       ))
+  $$,
+  $$values (1, 2, 2, 2, 0)$$,
+  'enqueue creates pending delivery per active same owner subscription and excludes disabled or tombstoned devices'
+);
+
+select lives_ok(
+  $$
+    select public.create_notification(
+      '70000000-0000-4000-8000-000000000001',
+      'chat_message', 'Ignored replacement', 'Reopened inbox body.',
+      '/app/chats/two-devices', '{}'::jsonb,
+      'delivery:enqueue:two-device', now() + interval '1 minute', true
+    )
+  $$,
+  'reopening an inbox notification does not fire the insert delivery trigger again'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from public.notification_deliveries as delivery
+    join public.notifications as notification
+      on notification.id = delivery.notification_id
+    where notification.dedupe_key = 'delivery:enqueue:two-device'
+  $$,
+  $$values (2)$$,
+  'notification reopen update does not duplicate device deliveries'
+);
+
+update public.notification_runtime_config set notification_core_enabled = false where id;
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Core off', 'Inbox only.', '/app', '{}'::jsonb, 'delivery:suppressed:core'
+);
+update public.notification_runtime_config
+set notification_core_enabled = true, push_enabled = false where id;
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Push off', 'Inbox only.', '/app', '{}'::jsonb, 'delivery:suppressed:push'
+);
+update public.notification_runtime_config
+set push_enabled = true, push_rollout_percentage = 0 where id;
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Rollout off', 'Inbox only.', '/app', '{}'::jsonb, 'delivery:suppressed:rollout'
+);
+update public.notification_runtime_config set push_rollout_percentage = 100 where id;
+update public.notification_preferences set push_enabled = false
+where user_id = '70000000-0000-4000-8000-000000000001';
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Master off', 'Inbox only.', '/app', '{}'::jsonb, 'delivery:suppressed:master'
+);
+update public.notification_preferences set push_enabled = true, chat_enabled = false
+where user_id = '70000000-0000-4000-8000-000000000001';
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Category off', 'Inbox only.', '/app', '{}'::jsonb, 'delivery:suppressed:category'
+);
+update public.notification_preferences set chat_enabled = true
+where user_id = '70000000-0000-4000-8000-000000000001';
+update public.notification_runtime_config set rewards_enabled = false where id;
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'streak_at_risk',
+  'Rewards off', 'Inbox only.', '/app/rewards', '{}'::jsonb,
+  'delivery:suppressed:rewards'
+);
+update public.notification_runtime_config set rewards_enabled = true where id;
+
+select results_eq(
+  $$
+    select
+      count(*)::integer,
+      coalesce(sum((select count(*) from public.notification_deliveries d
+                    where d.notification_id = n.id)), 0)::integer
+    from public.notifications n
+    where n.user_id = '70000000-0000-4000-8000-000000000001'
+      and n.dedupe_key like 'delivery:suppressed:%'
+  $$,
+  $$values (6, 0)$$,
+  'runtime rollout master category and rewards switches suppress only deliveries while retaining inbox rows'
+);
+
+update public.notification_preferences
+set timezone = 'UTC',
+    quiet_hours_start = ((now() at time zone 'UTC') - interval '1 hour')::time,
+    quiet_hours_end = ((now() at time zone 'UTC') + interval '1 hour')::time
+where user_id = '70000000-0000-4000-8000-000000000001';
+
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Quiet now', 'Defer both active devices.', '/app', '{}'::jsonb,
+  'delivery:quiet:deferred'
+);
+
+select results_eq(
+  $$
+    select state::text, count(*)::integer, bool_and(deliver_after > now())
+    from public.notification_deliveries d
+    join public.notifications n on n.id = d.notification_id
+    where n.dedupe_key = 'delivery:quiet:deferred'
+    group by state
+  $$,
+  $$values ('deferred'::text, 2, true)$$,
+  'notifications created during quiet hours enqueue deferred future deliveries'
+);
+
+update public.notification_preferences
+set quiet_hours_start = null, quiet_hours_end = null, daily_push_cap = 1
+where user_id = '70000000-0000-4000-8000-000000000001';
+
+update public.notification_deliveries d
+set state = 'sent', sent_at = now(), deliver_after = now()
+from public.notifications n
+where n.id = d.notification_id
+  and n.dedupe_key = 'delivery:enqueue:two-device';
+
+select results_eq(
+  $$
+    select
+      count(*)::integer,
+      count(distinct d.notification_id)::integer,
+      public.notification_push_allowed(
+        '70000000-0000-4000-8000-000000000001', 'chat', now()
+      )
+    from public.notification_deliveries d
+    where d.user_id = '70000000-0000-4000-8000-000000000001'
+      and d.state = 'sent'
+  $$,
+  $$values (2, 1, false)$$,
+  'two sent device rows consume one distinct notification cap unit'
+);
+
+update public.notification_preferences set timezone = 'America/New_York'
+where user_id = '70000000-0000-4000-8000-000000000001';
+update public.notification_deliveries d
+set sent_at = '2026-08-05 03:30:00+00'
+from public.notifications n
+where n.id = d.notification_id
+  and n.dedupe_key = 'delivery:enqueue:two-device';
+
+select results_eq(
+  $$
+    select
+      public.notification_push_allowed(
+        '70000000-0000-4000-8000-000000000001',
+        'chat',
+        '2026-08-05 03:45:00+00'
+      ),
+      public.notification_push_allowed(
+        '70000000-0000-4000-8000-000000000001',
+        'chat',
+        '2026-08-05 04:15:00+00'
+      )
+  $$,
+  $$values (false, true)$$,
+  'daily cap uses the preference timezone local calendar date rather than the UTC date'
+);
+
+update public.notification_preferences set timezone = 'UTC'
+where user_id = '70000000-0000-4000-8000-000000000001';
+update public.notification_deliveries d
+set sent_at = now()
+from public.notifications n
+where n.id = d.notification_id
+  and n.dedupe_key = 'delivery:enqueue:two-device';
+
+update public.notification_preferences set daily_push_cap = 2
+where user_id = '70000000-0000-4000-8000-000000000001';
+
+select is(
+  public.notification_push_allowed(
+    '70000000-0000-4000-8000-000000000001', 'chat', now()
+  ),
+  true,
+  'a distinct notification cap leaves capacity after one two-device notification'
+);
+
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001', 'chat_message',
+  'Cap after enqueue', 'This becomes ineligible before claim.', '/app',
+  '{}'::jsonb, 'delivery:claim-recheck:cap'
+);
+update public.notification_preferences set daily_push_cap = 1
+where user_id = '70000000-0000-4000-8000-000000000001';
+select count(*) from public.claim_notification_deliveries(100, 120);
+
+select results_eq(
+  $$
+    select
+      count(*) filter (where d.state = 'skipped')::integer,
+      count(distinct n.id)::integer
+    from public.notifications n
+    left join public.notification_deliveries d on d.notification_id = n.id
+    where n.dedupe_key = 'delivery:claim-recheck:cap'
+    group by n.id
+  $$,
+  $$values (2, 1)$$,
+  'claim-time cap changes skip device deliveries without deleting the inbox notification'
+);
+
+delete from public.notification_deliveries
+where user_id = '70000000-0000-4000-8000-000000000001';
+update public.notification_preferences set daily_push_cap = 50
+where user_id = '70000000-0000-4000-8000-000000000001';
+update public.notification_runtime_config set push_rollout_percentage = 0 where id;
+
+insert into public.notifications (
+  id, user_id, type, category, title, body, url, dedupe_key
+)
+values
+  ('70000000-0000-4000-8000-000000000031','70000000-0000-4000-8000-000000000001','chat_message','chat','Due pending','Due pending body.','/app','delivery:claim:pending'),
+  ('70000000-0000-4000-8000-000000000032','70000000-0000-4000-8000-000000000001','chat_message','chat','Future deferred','Future deferred body.','/app','delivery:claim:future'),
+  ('70000000-0000-4000-8000-000000000033','70000000-0000-4000-8000-000000000001','chat_message','chat','Live processing','Live processing body.','/app','delivery:claim:live'),
+  ('70000000-0000-4000-8000-000000000034','70000000-0000-4000-8000-000000000001','chat_message','chat','Expired processing','Expired processing body.','/app','delivery:claim:expired');
+
+update public.notification_runtime_config set push_rollout_percentage = 100 where id;
+insert into public.notification_deliveries (
+  id, notification_id, subscription_id, user_id, state, deliver_after,
+  claimed_at, claim_token, claim_expires_at, attempts
+)
+values
+  ('70000000-0000-4000-8000-000000000131','70000000-0000-4000-8000-000000000031','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','pending',now() - interval '10 minutes',null,null,null,0),
+  ('70000000-0000-4000-8000-000000000132','70000000-0000-4000-8000-000000000032','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','deferred',now() + interval '1 hour',null,null,null,0),
+  ('70000000-0000-4000-8000-000000000133','70000000-0000-4000-8000-000000000033','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000233',now() + interval '1 hour',1),
+  ('70000000-0000-4000-8000-000000000134','70000000-0000-4000-8000-000000000034','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now() - interval '10 minutes','70000000-0000-4000-8000-000000000234',now() - interval '1 minute',1);
+
+select results_eq(
+  $$
+    select delivery_id, attempt_count
+    from public.claim_notification_deliveries(10, 120)
+    order by delivery_id
+  $$,
+  $$
+    values
+      ('70000000-0000-4000-8000-000000000131'::uuid, 1),
+      ('70000000-0000-4000-8000-000000000134'::uuid, 2)
+  $$,
+  'claim selects due pending work and expired processing leases only'
+);
+
+select results_eq(
+  $$
+    select
+      count(*) filter (
+        where id in ('70000000-0000-4000-8000-000000000131','70000000-0000-4000-8000-000000000134')
+          and state = 'processing' and claimed_at is not null
+          and claim_token is not null and claim_expires_at > claimed_at
+      )::integer,
+      count(*) filter (
+        where id = '70000000-0000-4000-8000-000000000134'
+          and claim_token <> '70000000-0000-4000-8000-000000000234'
+          and attempts = 2
+      )::integer,
+      count(*) filter (
+        where id = '70000000-0000-4000-8000-000000000132'
+          and state = 'deferred' and attempts = 0
+      )::integer,
+      count(*) filter (
+        where id = '70000000-0000-4000-8000-000000000133'
+          and state = 'processing' and attempts = 1
+      )::integer
+    from public.notification_deliveries
+    where id between '70000000-0000-4000-8000-000000000131'
+      and '70000000-0000-4000-8000-000000000134'
+  $$,
+  $$values (2, 1, 1, 1)$$,
+  'claim tokens timestamps attempt increments lease recovery and exclusions are exact'
+);
+
+select throws_ok(
+  $$select count(*) from public.claim_notification_deliveries(0, 120)$$,
+  '22023'::char(5), 'Claim limit must be between 1 and 100',
+  'claim validates its limit'
+);
+
+select throws_ok(
+  $$select count(*) from public.claim_notification_deliveries(1, 29)$$,
+  '22023'::char(5), 'Lease seconds must be between 30 and 600',
+  'claim validates its lease duration'
+);
+
+-- Each recheck fixture is enqueued while eligible and becomes ineligible only
+-- after insertion. Claim must mutate it but never return it to a worker.
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001','chat_message','Core changed',
+  'Core changed after enqueue.','/app','{}','delivery:recheck:core'
+);
+update public.notification_runtime_config set notification_core_enabled = false where id;
+select is((select count(*) from public.claim_notification_deliveries(10,120)),0::bigint,
+  'claim does not return deliveries suppressed by a runtime core change');
+update public.notification_runtime_config set notification_core_enabled = true where id;
+
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001','chat_message','Category changed',
+  'Category changed after enqueue.','/app','{}','delivery:recheck:category'
+);
+update public.notification_preferences set chat_enabled = false
+where user_id = '70000000-0000-4000-8000-000000000001';
+select is((select count(*) from public.claim_notification_deliveries(10,120)),0::bigint,
+  'claim does not return deliveries suppressed by a category preference change');
+update public.notification_preferences set chat_enabled = true
+where user_id = '70000000-0000-4000-8000-000000000001';
+
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001','chat_message','Rollout changed',
+  'Rollout changed after enqueue.','/app','{}','delivery:recheck:rollout'
+);
+update public.notification_runtime_config set push_rollout_percentage = 0 where id;
+select is((select count(*) from public.claim_notification_deliveries(10,120)),0::bigint,
+  'claim does not return deliveries suppressed by a rollout change');
+update public.notification_runtime_config set push_rollout_percentage = 100 where id;
+
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001','chat_message','Subscription changed',
+  'Subscription disabled after enqueue.','/app','{}','delivery:recheck:subscription'
+);
+update public.push_subscriptions set disabled_at = now()
+where id in ('70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000022');
+select is((select count(*) from public.claim_notification_deliveries(10,120)),0::bigint,
+  'claim does not return deliveries for subscriptions disabled after enqueue');
+update public.push_subscriptions set disabled_at = null
+where id in ('70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000022');
+
+select public.create_notification(
+  '70000000-0000-4000-8000-000000000001','chat_message','Quiet changed',
+  'Quiet hours enabled after enqueue.','/app','{}','delivery:recheck:quiet'
+);
+update public.notification_preferences
+set quiet_hours_start = ((now() at time zone 'UTC') - interval '1 hour')::time,
+    quiet_hours_end = ((now() at time zone 'UTC') + interval '1 hour')::time
+where user_id = '70000000-0000-4000-8000-000000000001';
+select is((select count(*) from public.claim_notification_deliveries(10,120)),0::bigint,
+  'claim does not return work newly covered by quiet hours');
+
+select results_eq(
+  $$
+    select count(*)::integer, bool_and(d.deliver_after > now())
+    from public.notification_deliveries d
+    join public.notifications n on n.id = d.notification_id
+    where n.dedupe_key = 'delivery:recheck:quiet'
+      and d.state = 'deferred'
+  $$,
+  $$values (2, true)$$,
+  'claim-time quiet hours defer work to a new future deliver_after'
+);
+
+update public.notification_preferences
+set quiet_hours_start = null, quiet_hours_end = null
+where user_id = '70000000-0000-4000-8000-000000000001';
+
+delete from public.notification_deliveries
+where user_id = '70000000-0000-4000-8000-000000000001';
+update public.notification_runtime_config set push_rollout_percentage = 0 where id;
+
+insert into public.notifications (
+  id, user_id, type, category, title, body, url, dedupe_key
+)
+values
+  ('70000000-0000-4000-8000-000000000061','70000000-0000-4000-8000-000000000001','chat_message','chat','Success result','Success body.','/app','delivery:result:success'),
+  ('70000000-0000-4000-8000-000000000062','70000000-0000-4000-8000-000000000001','chat_message','chat','Gone 404','Gone 404 body.','/app','delivery:result:404'),
+  ('70000000-0000-4000-8000-000000000063','70000000-0000-4000-8000-000000000001','chat_message','chat','Gone 410','Gone 410 body.','/app','delivery:result:410'),
+  ('70000000-0000-4000-8000-000000000064','70000000-0000-4000-8000-000000000001','chat_message','chat','Network retry','Network retry body.','/app','delivery:result:network'),
+  ('70000000-0000-4000-8000-000000000065','70000000-0000-4000-8000-000000000001','chat_message','chat','Rate retry','Rate retry body.','/app','delivery:result:429'),
+  ('70000000-0000-4000-8000-000000000066','70000000-0000-4000-8000-000000000001','chat_message','chat','Server retry','Server retry body.','/app','delivery:result:503'),
+  ('70000000-0000-4000-8000-000000000067','70000000-0000-4000-8000-000000000001','chat_message','chat','Permanent failure','Permanent failure body.','/app','delivery:result:400'),
+  ('70000000-0000-4000-8000-000000000068','70000000-0000-4000-8000-000000000001','chat_message','chat','Fifth failure','Fifth failure body.','/app','delivery:result:fifth'),
+  ('70000000-0000-4000-8000-000000000069','70000000-0000-4000-8000-000000000001','chat_message','chat','Stale token','Stale token body.','/app','delivery:result:stale'),
+  ('70000000-0000-4000-8000-000000000070','70000000-0000-4000-8000-000000000001','chat_message','chat','Expired token','Expired token body.','/app','delivery:result:expired'),
+  ('70000000-0000-4000-8000-000000000071','70000000-0000-4000-8000-000000000001','chat_message','chat','Partial devices','Partial device body.','/app','delivery:result:partial');
+
+update public.notification_runtime_config set push_rollout_percentage = 100 where id;
+update public.push_subscriptions set disabled_at = null, failure_count = 0
+where id in ('70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000022');
+
+insert into public.notification_deliveries (
+  id, notification_id, subscription_id, user_id, state, deliver_after,
+  claimed_at, claim_token, claim_expires_at, attempts
+)
+values
+  ('70000000-0000-4000-8000-000000000161','70000000-0000-4000-8000-000000000061','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000261',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000162','70000000-0000-4000-8000-000000000062','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000262',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000163','70000000-0000-4000-8000-000000000063','70000000-0000-4000-8000-000000000022','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000263',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000164','70000000-0000-4000-8000-000000000064','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000264',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000165','70000000-0000-4000-8000-000000000065','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000265',now()+interval '10 minutes',2),
+  ('70000000-0000-4000-8000-000000000166','70000000-0000-4000-8000-000000000066','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000266',now()+interval '10 minutes',3),
+  ('70000000-0000-4000-8000-000000000167','70000000-0000-4000-8000-000000000067','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000267',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000168','70000000-0000-4000-8000-000000000068','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000268',now()+interval '10 minutes',5),
+  ('70000000-0000-4000-8000-000000000169','70000000-0000-4000-8000-000000000069','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000269',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000170','70000000-0000-4000-8000-000000000070','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now()-interval '10 minutes','70000000-0000-4000-8000-000000000270',now()-interval '1 minute',1),
+  ('70000000-0000-4000-8000-000000000171','70000000-0000-4000-8000-000000000071','70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000271',now()+interval '10 minutes',1),
+  ('70000000-0000-4000-8000-000000000172','70000000-0000-4000-8000-000000000071','70000000-0000-4000-8000-000000000022','70000000-0000-4000-8000-000000000001','processing',now(),now(),'70000000-0000-4000-8000-000000000272',now()+interval '10 minutes',1);
+
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000161',
+    '70000000-0000-4000-8000-000000000261', 204, null
+  )::text,
+  'sent',
+  'a successful HTTP result marks the matching current claim sent'
+);
+
+select results_eq(
+  $$
+    select state::text, sent_at is not null, claim_token is null,
+           claimed_at is null, claim_expires_at is null
+    from public.notification_deliveries
+    where id = '70000000-0000-4000-8000-000000000161'
+  $$,
+  $$values ('sent'::text, true, true, true, true)$$,
+  'sent result stores sent_at and clears all lease fields'
+);
+
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000162',
+    '70000000-0000-4000-8000-000000000262', 404, 'push_gone'
+  )::text,
+  'skipped',
+  'HTTP 404 skips the delivery'
+);
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000163',
+    '70000000-0000-4000-8000-000000000263', 410, 'push_expired'
+  )::text,
+  'skipped',
+  'HTTP 410 skips the delivery'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer, bool_and(disabled_at is not null),
+           bool_and(failure_count = 1)
+    from public.push_subscriptions
+    where id in ('70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000022')
+  $$,
+  $$values (2, true, true)$$,
+  '404 and 410 disable only their subscriptions and increment failure counters'
+);
+
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000164',
+    '70000000-0000-4000-8000-000000000264', null, 'network timeout'
+  )::text,
+  'deferred',
+  'a network result schedules a retry below attempt five'
+);
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000165',
+    '70000000-0000-4000-8000-000000000265', 429, 'rate-limited'
+  )::text,
+  'deferred',
+  'HTTP 429 schedules a retry below attempt five'
+);
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000166',
+    '70000000-0000-4000-8000-000000000266', 503, ' bad code ! '
+  )::text,
+  'deferred',
+  'HTTP 5xx schedules a retry below attempt five'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer, bool_and(deliver_after > now()),
+           bool_and(deliver_after <= now() + interval '1 hour'),
+           max(last_error_code) filter (
+             where id = '70000000-0000-4000-8000-000000000166'
+           )
+    from public.notification_deliveries
+    where id in (
+      '70000000-0000-4000-8000-000000000164',
+      '70000000-0000-4000-8000-000000000165',
+      '70000000-0000-4000-8000-000000000166'
+    ) and state = 'deferred'
+  $$,
+  $$values (3, true, true, 'badcode'::text)$$,
+  'network rate and server retries use bounded backoff and sanitized error codes'
+);
+
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000167',
+    '70000000-0000-4000-8000-000000000267', 400, 'bad_request'
+  )::text,
+  'failed',
+  'a permanent HTTP 4xx marks the delivery failed'
+);
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000168',
+    '70000000-0000-4000-8000-000000000268', 503, 'still_down'
+  )::text,
+  'failed',
+  'a transient result on attempt five becomes terminal failed'
+);
+
+select throws_ok(
+  $$
+    select public.record_notification_delivery_result(
+      '70000000-0000-4000-8000-000000000169',
+      '70000000-0000-4000-8000-000000000999', 200, null
+    )
+  $$,
+  '40001'::char(5),
+  'Stale or expired notification delivery claim',
+  'a stale claim token cannot overwrite the current claim'
+);
+select throws_ok(
+  $$
+    select public.record_notification_delivery_result(
+      '70000000-0000-4000-8000-000000000170',
+      '70000000-0000-4000-8000-000000000270', 200, null
+    )
+  $$,
+  '40001'::char(5),
+  'Stale or expired notification delivery claim',
+  'an expired matching token cannot record a result'
+);
+
+update public.notification_deliveries
+set state = 'failed',
+    claimed_at = null,
+    claim_token = null,
+    claim_expires_at = null
+where id = '70000000-0000-4000-8000-000000000170';
+
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000171',
+    '70000000-0000-4000-8000-000000000271', 201, null
+  )::text,
+  'sent',
+  'the successful device in a multi-device notification is sent'
+);
+select is(
+  public.record_notification_delivery_result(
+    '70000000-0000-4000-8000-000000000172',
+    '70000000-0000-4000-8000-000000000272', 503, 'temporary'
+  )::text,
+  'deferred',
+  'the transient device in a multi-device notification remains retryable'
+);
+
+select results_eq(
+  $$
+    select state::text, count(*)::integer
+    from public.notification_deliveries
+    where notification_id = '70000000-0000-4000-8000-000000000071'
+    group by state order by state
+  $$,
+  $$values ('deferred'::text, 1), ('sent'::text, 1)$$,
+  'multi-device partial outcomes remain independent rows'
+);
+
+update public.push_subscriptions set disabled_at = null
+where id in ('70000000-0000-4000-8000-000000000021','70000000-0000-4000-8000-000000000022');
+update public.notification_deliveries set deliver_after = now() - interval '1 second'
+where id = '70000000-0000-4000-8000-000000000172';
+
+select results_eq(
+  $$select delivery_id from public.claim_notification_deliveries(10, 120)$$,
+  $$values ('70000000-0000-4000-8000-000000000172'::uuid)$$,
+  'retry claims only the transient device and never reclaims its sent sibling'
+);
+
+select throws_ok(
+  $$
+    select public.record_notification_delivery_result(
+      '70000000-0000-4000-8000-000000000172',
+      '70000000-0000-4000-8000-000000000272', 200, null
+    )
+  $$,
+  '40001'::char(5),
+  'Stale or expired notification delivery claim',
+  'an old token cannot overwrite a reclaimed delivery'
+);
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '72000000-0000-4000-8000-000000000001',
+  'authenticated', 'authenticated', 'cleanup-fixture@umd.edu', '', now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Cleanup Fixture"}'::jsonb,
+  now(), now()
+);
+
+update public.notification_runtime_config set push_rollout_percentage = 0 where id;
+insert into public.push_subscriptions (
+  id, user_id, endpoint, p256dh, auth, disabled_at
+)
+values
+  ('72000000-0000-4000-8000-000000000021','72000000-0000-4000-8000-000000000001','https://push.example.test/cleanup/removable','cleanup-key-1','cleanup-auth-1','2026-05-01 00:00:00+00'),
+  ('72000000-0000-4000-8000-000000000022','72000000-0000-4000-8000-000000000001','https://push.example.test/cleanup/nonterminal','cleanup-key-2','cleanup-auth-2','2026-05-01 00:00:00+00'),
+  ('72000000-0000-4000-8000-000000000023','72000000-0000-4000-8000-000000000001','https://push.example.test/cleanup/recent-audit','cleanup-key-3','cleanup-auth-3','2026-05-01 00:00:00+00');
+
+insert into public.notifications (
+  id, user_id, type, category, title, body, url, dedupe_key,
+  read_at, created_at, last_event_at
+)
+values
+  ('72000000-0000-4000-8000-000000000031','72000000-0000-4000-8000-000000000001','chat_message','chat','Old read removable','Old read removable body.','/app','delivery:cleanup:removable','2026-06-01','2026-06-01','2026-06-01'),
+  ('72000000-0000-4000-8000-000000000032','72000000-0000-4000-8000-000000000001','chat_message','chat','Old unread retained','Old unread retained body.','/app','delivery:cleanup:unread',null,'2026-06-01','2026-06-01'),
+  ('72000000-0000-4000-8000-000000000033','72000000-0000-4000-8000-000000000001','chat_message','chat','Old pending retained','Old pending retained body.','/app','delivery:cleanup:pending','2026-06-01','2026-06-01','2026-06-01'),
+  ('72000000-0000-4000-8000-000000000034','72000000-0000-4000-8000-000000000001','chat_message','chat','Recent audit retained','Recent audit retained body.','/app','delivery:cleanup:recent-audit','2026-06-01','2026-06-01','2026-06-01');
+
+insert into public.notification_deliveries (
+  id, notification_id, subscription_id, user_id, state, deliver_after,
+  sent_at, updated_at
+)
+values
+  ('72000000-0000-4000-8000-000000000131','72000000-0000-4000-8000-000000000031','72000000-0000-4000-8000-000000000021','72000000-0000-4000-8000-000000000001','sent','2026-06-01','2026-06-01','2026-06-01'),
+  ('72000000-0000-4000-8000-000000000133','72000000-0000-4000-8000-000000000033','72000000-0000-4000-8000-000000000022','72000000-0000-4000-8000-000000000001','pending','2026-06-01',null,'2026-06-01'),
+  ('72000000-0000-4000-8000-000000000134','72000000-0000-4000-8000-000000000034','72000000-0000-4000-8000-000000000023','72000000-0000-4000-8000-000000000001','sent','2026-08-01','2026-08-01','2026-08-01');
+
+select is(
+  public.cleanup_notification_data('2026-08-04 12:00:00+00'),
+  '{"notifications_deleted":1,"deliveries_deleted":1,"subscriptions_deleted":1}'::jsonb,
+  'cleanup returns exact deletion counts in dependency-safe order'
+);
+
+select results_eq(
+  $$
+    select
+      count(*) filter (where n.id = '72000000-0000-4000-8000-000000000032')::integer,
+      count(*) filter (where n.id = '72000000-0000-4000-8000-000000000033')::integer,
+      count(*) filter (where n.id = '72000000-0000-4000-8000-000000000034')::integer,
+      (select count(*)::integer from public.notification_deliveries
+       where id in ('72000000-0000-4000-8000-000000000133','72000000-0000-4000-8000-000000000134')),
+      (select count(*)::integer from public.push_subscriptions
+       where id in ('72000000-0000-4000-8000-000000000022','72000000-0000-4000-8000-000000000023'))
+    from public.notifications n
+    where n.user_id = '72000000-0000-4000-8000-000000000001'
+  $$,
+  $$values (1, 1, 1, 2, 2)$$,
+  'cleanup retains unread inbox nonterminal work recent audit and their disabled subscriptions'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"70000000-0000-4000-8000-000000000001","app_metadata":{"role":"student"}}',
+  true
+);
+set local role authenticated;
+
+select throws_ok(
+  $$select public.notification_operations_summary()$$,
+  '42501'::char(5),
+  'Not authorized',
+  'ordinary authenticated users cannot read notification operations aggregates'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"70000000-0000-4000-8000-000000000001","app_metadata":{"role":"safety_owner"}}',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$select key from jsonb_object_keys(public.notification_operations_summary()) as key order by key$$,
+  $$
+    values
+      ('active_subscriptions'::text),
+      ('disabled_subscriptions'::text),
+      ('due_deliveries'::text),
+      ('failed_deliveries'::text),
+      ('opted_in_users'::text),
+      ('pending_deliveries'::text),
+      ('processing_deliveries'::text),
+      ('recent_errors'::text),
+      ('retry_deliveries'::text),
+      ('sent_deliveries'::text)
+  $$,
+  'operations summary exposes every required aggregate and no extra raw records'
+);
+
+select ok(
+  exists (
+    select 1
+    from jsonb_array_elements(
+      public.notification_operations_summary() -> 'recent_errors'
+    ) as error_item
+    where error_item ->> 'category' = 'chat'
+      and error_item ->> 'code' = 'badcode'
+      and (error_item ->> 'count')::integer >= 1
+  ),
+  'operations summary groups recent errors by notification category and sanitized code'
+);
+
+select ok(
+  public.notification_operations_summary()::text
+    !~ '"(body|endpoint|p256dh|auth|user_id|notification_id|data)"',
+  'operations summary contains no message subscription secret notification data or raw identifier fields'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    with summary as (
+      select public.notification_operations_summary() as value
+    )
+    select
+      (value ->> 'opted_in_users')::bigint
+        = (select count(*) from public.notification_preferences where push_enabled),
+      (value ->> 'active_subscriptions')::bigint
+        = (select count(*) from public.push_subscriptions where disabled_at is null),
+      (value ->> 'disabled_subscriptions')::bigint
+        = (select count(*) from public.push_subscriptions where disabled_at is not null),
+      (value ->> 'pending_deliveries')::bigint
+        = (select count(*) from public.notification_deliveries where state = 'pending'),
+      (value ->> 'due_deliveries')::bigint
+        = (select count(*) from public.notification_deliveries
+           where state in ('pending','deferred') and deliver_after <= now()),
+      (value ->> 'processing_deliveries')::bigint
+        = (select count(*) from public.notification_deliveries where state = 'processing'),
+      (value ->> 'sent_deliveries')::bigint
+        = (select count(*) from public.notification_deliveries where state = 'sent'),
+      (value ->> 'failed_deliveries')::bigint
+        = (select count(*) from public.notification_deliveries where state = 'failed'),
+      (value ->> 'retry_deliveries')::bigint
+        = (select count(*) from public.notification_deliveries where state = 'deferred')
+    from summary
+  $$,
+  $$values (true, true, true, true, true, true, true, true, true)$$,
+  'operations summary counts match the underlying privacy-safe aggregates'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from pg_catalog.pg_proc as proc
+    join pg_catalog.pg_namespace as namespace on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'public'
+      and proc.proname in (
+        'notification_rollout_eligible',
+        'notification_deliver_after',
+        'notification_push_allowed',
+        'enqueue_notification_deliveries',
+        'claim_notification_deliveries',
+        'record_notification_delivery_result',
+        'notification_operations_summary',
+        'cleanup_notification_data'
+      )
+      and (
+        not proc.prosecdef
+        or not coalesce(proc.proconfig, '{}'::text[]) @> array['search_path=""']
+      )
+  $$,
+  $$values (0)$$,
+  'every delivery helper is SECURITY DEFINER with a fixed empty search_path'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from pg_catalog.pg_proc as proc
+    join pg_catalog.pg_namespace as namespace on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'public'
+      and proc.proname in (
+        'notification_rollout_eligible',
+        'notification_deliver_after',
+        'notification_push_allowed',
+        'enqueue_notification_deliveries',
+        'claim_notification_deliveries',
+        'record_notification_delivery_result',
+        'cleanup_notification_data'
+      )
+      and (
+        pg_catalog.has_function_privilege('authenticated', proc.oid, 'execute')
+        or pg_catalog.has_function_privilege('anon', proc.oid, 'execute')
+      )
+  $$,
+  $$values (0)$$,
+  'trusted delivery helpers and trigger functions are never client executable'
+);
+
+select ok(
+  pg_catalog.has_function_privilege(
+    'authenticated', 'public.notification_operations_summary()'::regprocedure, 'execute'
+  ),
+  'authenticated may invoke the self-authorizing operations summary'
+);
+
+select is(
+  pg_catalog.has_function_privilege(
+    'anon', 'public.notification_operations_summary()'::regprocedure, 'execute'
+  ),
+  false,
+  'anon cannot invoke the operations summary'
+);
+
+select results_eq(
+  $$
+    select
+      pg_catalog.has_function_privilege(
+        'service_role', 'public.claim_notification_deliveries(integer,integer)'::regprocedure, 'execute'
+      ),
+      pg_catalog.has_function_privilege(
+        'service_role', 'public.record_notification_delivery_result(uuid,uuid,integer,text)'::regprocedure, 'execute'
+      ),
+      pg_catalog.has_function_privilege(
+        'service_role', 'public.cleanup_notification_data(timestamp with time zone)'::regprocedure, 'execute'
+      )
+  $$,
+  $$values (true, true, true)$$,
+  'claim result and cleanup execution is granted to service_role'
+);
+
+select results_eq(
+  $$
+    select array_agg(attribute.attname order by attribute.attnum)
+    from pg_catalog.pg_type as type
+    join pg_catalog.pg_class as relation on relation.oid = type.typrelid
+    join pg_catalog.pg_attribute as attribute on attribute.attrelid = relation.oid
+    where type.typnamespace = 'public'::regnamespace
+      and type.typname = 'notification_delivery_claim'
+      and attribute.attnum > 0 and not attribute.attisdropped
+  $$,
+  $$
+    values (array[
+      'delivery_id','claim_token','notification_id','user_id','subscription_id',
+      'endpoint','p256dh','auth','title','body','url','type','category',
+      'unread_badge_count','attempt_count'
+    ]::name[])
+  $$,
+  'delivery claim type contains only the worker contract and excludes arbitrary notification data'
+);
+
+select results_eq(
+  $$
+    select
+      (select count(*)::integer from pg_catalog.pg_type
+       where typnamespace = 'public'::regnamespace
+         and typname = 'notification_delivery_claim'),
+      (select count(*)::integer from pg_catalog.pg_trigger
+       where tgrelid = 'public.notifications'::regclass
+         and tgname = 'enqueue_notification_deliveries_after_insert'
+         and not tgisinternal)
+  $$,
+  $$values (1, 1)$$,
+  'delivery type and enqueue trigger remain singular under migration replay'
 );
 
 select * from finish();
