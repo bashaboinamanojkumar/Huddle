@@ -93,7 +93,7 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
+      <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
