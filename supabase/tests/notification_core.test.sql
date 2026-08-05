@@ -3906,5 +3906,73 @@ select results_eq(
   'delivery type and enqueue trigger remain singular under migration replay'
 );
 
+select has_extension('pg_net', 'pg_net is enabled for asynchronous Edge dispatch');
+select has_extension('pg_cron', 'pg_cron is enabled for recovery and cleanup jobs');
+select has_extension('supabase_vault', 'Supabase Vault is enabled for dispatch configuration');
+
+select function_returns(
+  'public',
+  'request_push_dispatch',
+  array[]::text[],
+  'jsonb',
+  'request_push_dispatch returns an operational status without blocking inbox writes'
+);
+
+select results_eq(
+  $$
+    select count(*)::integer
+    from pg_catalog.pg_trigger
+    where tgrelid = 'public.notification_deliveries'::regclass
+      and tgname = 'dispatch_notification_deliveries_after_insert'
+      and not tgisinternal
+      and pg_catalog.pg_get_triggerdef(oid) like '%FOR EACH STATEMENT%'
+      and pg_catalog.pg_get_triggerdef(oid) like '%REFERENCING NEW TABLE AS inserted_deliveries%'
+  $$,
+  $$values (1)$$,
+  'delivery inserts request one asynchronous dispatch per insert statement'
+);
+
+select results_eq(
+  $$
+    select jobname, count(*)::integer
+    from cron.job
+    where jobname in (
+      'huddle-notification-delivery-retry',
+      'huddle-notification-cleanup'
+    )
+    group by jobname
+    order by jobname
+  $$,
+  $$
+    values
+      ('huddle-notification-cleanup'::text, 1),
+      ('huddle-notification-delivery-retry'::text, 1)
+  $$,
+  'exactly one retry job and one cleanup job are installed'
+);
+
+select results_eq(
+  $$select public.request_push_dispatch() ->> 'status'$$,
+  $$values ('not_configured'::text)$$,
+  'missing Vault values make push dispatch a non-fatal no-op'
+);
+
+select results_eq(
+  $$
+    select
+      pg_catalog.has_function_privilege(
+        'anon', 'public.request_push_dispatch()'::regprocedure, 'execute'
+      ),
+      pg_catalog.has_function_privilege(
+        'authenticated', 'public.request_push_dispatch()'::regprocedure, 'execute'
+      ),
+      pg_catalog.has_function_privilege(
+        'service_role', 'public.request_push_dispatch()'::regprocedure, 'execute'
+      )
+  $$,
+  $$values (false, false, true)$$,
+  'only service-role infrastructure may invoke dispatch directly'
+);
+
 select * from finish();
 rollback;
