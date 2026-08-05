@@ -7,6 +7,7 @@ import { useMemo, useState } from "react"
 import Link from "next/link"
 import { Bell, Search, ShieldAlert } from "lucide-react"
 import { ActivityCard } from "@/components/huddle/activity-card"
+import { HuddleWordmark } from "@/components/huddle/huddle-icons"
 
 import { useHuddle } from "@/lib/store/huddle-store"
 import { categoryMeta } from "@/lib/data/metadata"
@@ -49,21 +50,17 @@ export default function CommunityPage() {
       <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10"
-              style={{ backgroundColor: "rgba(255,255,255,0.08)" }}
-            >
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 border border-white/10">
               <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
             </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
-                {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
-              </p>
-              <h1 className="font-heading text-xl font-black leading-none text-white">
-                All events
-              </h1>
-            </div>
+            <HuddleWordmark className="text-white text-lg" />
           </div>
+          <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
+            All events
+          </h1>
+          <p className="mt-1 text-xs text-white/62 uppercase tracking-[0.2em] font-semibold">
+            {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
+          </p>
           <Link
             href="/app/profile"
             className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
@@ -144,7 +141,7 @@ export default function CommunityPage() {
               className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
                 category === "all"
                   ? "border-secondary bg-secondary/18"
-                  : "border-white/10 bg-white/8"
+                  : "border-white/6 bg-transparent"
               }`}
             >
               <span className="text-2xl">✦</span>
@@ -159,7 +156,7 @@ export default function CommunityPage() {
                 className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
                   category === item.id
                     ? "border-secondary bg-secondary/18"
-                    : "border-white/10 bg-white/8"
+                    : "border-white/6 bg-transparent"
                 }`}
               >
                 <CategoryIcon

@@ -99,12 +99,7 @@ export default function FeedPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 border border-white/10">
               <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
             </div>
-            <div>
-              <HuddleWordmark className="text-white text-xl" />
-              <h1 className="font-heading text-xl font-black leading-none text-white">
-                Hey, {currentProfile.firstName} 👋
-              </h1>
-            </div>
+            <HuddleWordmark className="text-white text-lg" />
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -125,6 +120,11 @@ export default function FeedPage() {
             </Link>
           </div>
         </div>
+
+        <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
+          Hey, {currentProfile.firstName} 👋
+        </h1>
+        <p className="mt-1 text-sm text-white/62">Good to see you. Here's what's happening.</p>
 
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-3xl bg-white/8 p-3">
