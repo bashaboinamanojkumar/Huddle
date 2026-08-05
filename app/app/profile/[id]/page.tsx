@@ -7,6 +7,8 @@ import { ArrowLeft, Award, CalendarHeart, GraduationCap, UserCheck, UserPlus } f
 import { toast } from "sonner"
 import { getCategoryMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
+import { CategoryIcon } from "@/components/huddle/category-icon"
+
 
 const statusLabels: Record<string, string> = {
   undergrad_1: "Freshman",
@@ -107,9 +109,12 @@ export default function StudentProfilePage() {
               {statusLabels[profile.status] ?? "Student"}
             </div>
             {sharedInterests.length > 0 && (
-              <p className="mt-1 text-xs text-secondary font-semibold">
-                〰️ Same wavelength on {sharedInterests.length} interest{sharedInterests.length > 1 ? "s" : ""}
-              </p>
+              <div className="mt-1 flex items-center gap-1">
+                <img src="/icons/categories/same-wavelength.png" alt="same wavelength" className="h-4 w-4 object-contain" style={{ mixBlendMode: "screen" }} />
+                <p className="text-xs text-secondary font-semibold">
+                  Same wavelength on {sharedInterests.length} interest{sharedInterests.length > 1 ? "s" : ""}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -205,14 +210,20 @@ export default function StudentProfilePage() {
               const meta = getCategoryMeta(interest)
               const isShared = sharedInterests.includes(interest)
               return (
-                <span
+                <div
                   key={interest}
-                  className={`rounded-full px-3 py-2 text-xs font-bold ${
-                    isShared ? "bg-secondary/20 text-secondary" : "bg-white/8 text-white/62"
+                  className={`flex items-center gap-2 rounded-full px-3 py-2 ${
+                    isShared ? "bg-secondary/20" : "bg-white/8"
                   }`}
                 >
-                  {isShared && "〰️ "}{meta.shortLabel}
-                </span>
+                  <CategoryIcon category={interest} className="h-4 w-4" />
+                  <span className={`text-xs font-bold ${isShared ? "text-secondary" : "text-white/62"}`}>
+                    {meta.shortLabel}
+                  </span>
+                  {isShared && (
+                    <img src="/icons/categories/same-wavelength.png" alt="same wavelength" className="h-3.5 w-3.5 object-contain" style={{ mixBlendMode: "screen" }} />
+                  )}
+                </div>
               )
             })}
           </div>
