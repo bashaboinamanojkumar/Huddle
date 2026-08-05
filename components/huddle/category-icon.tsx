@@ -14,6 +14,7 @@ const iconMap: Record<Category, string> = {
   sports: "/icons/categories/sports.png",
 }
 
+
 export function CategoryIcon({ category, className }: { category: Category; className?: string }) {
   return (
     <img
