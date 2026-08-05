@@ -53,6 +53,9 @@
   --shell: #F7F4EE;
   --kelp: #223A3B;
   --driftwood: #D9C4B4;
+  --font-inter: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-poppins: "Avenir Next", Avenir, ui-rounded, "Segoe UI", sans-serif;
+  --font-lora: Georgia, Cambria, "Times New Roman", serif;
 }
 
 @theme inline {

@@ -134,3 +134,42 @@ appears in Push or logs.
 
 Live Web Push remains pending until the linked production project, Vercel
 deployment, and real devices have completed this checklist.
+
+## CI release gate
+
+`.github/workflows/ci.yml` blocks release on three independent jobs:
+
+- Application: Vitest, TypeScript, ESLint, and the production Next.js build.
+- Edge Function: delivery-state unit tests and a Deno type check.
+- Database and browser: clean migration replay, strict schema lint, all pgTAP
+  tests, SQL/TypeScript score parity, empty schema diff, and the Chromium
+  notification suite.
+
+The browser job covers inbox state, mark-all, settings defaults and persistence,
+validated deep links, pulse authorization and immutability, first-RSVP Push
+eligibility, and the iOS install-first decision. Its iOS case is an emulated
+eligibility test, not a substitute for the installed-device delivery checklist
+above. Failed browser runs retain traces, screenshots, and video for 14 days.
+
+## Rollback and recovery
+
+Database migrations are forward-only in production. Never run `db reset`,
+delete migration-ledger rows, or apply a down migration to the linked project.
+If a database change needs remediation, leave inbox delivery enabled, disable
+Push, and ship a new corrective migration.
+
+Use this containment sequence for a Push incident:
+
+1. Set `push_enabled=false` in `notification_runtime_config`.
+2. Confirm `request_push_dispatch()` returns without interrupting inbox writes.
+3. Roll the web application back to its last known-good Vercel deployment.
+4. Redeploy the last known-good `send-push` source with
+   `npx supabase functions deploy send-push --no-verify-jwt`.
+5. Inspect aggregate delivery codes only; never export endpoint or payload data.
+6. Apply any database correction as a new migration, rerun CI, and restore Push
+   first at `0%`.
+
+Before any recovery deployment, compare the linked migration ledger with local
+files using `npx supabase migration list --linked`. Production writes and live
+rollout changes require an authenticated operator and are intentionally not
+performed by the local release suite.

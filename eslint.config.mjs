@@ -6,6 +6,7 @@ export default [
     ignores: [
       ".next/**",
       "node_modules/**",
+      "output/playwright/**",
       "public/sw.js",
       "supabase/functions/**",
       "_docx_extracted.xml",

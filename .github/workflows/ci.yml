@@ -1,0 +1,105 @@
+name: Production release gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  application:
+    name: Application
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm build
+
+  edge-function:
+    name: Edge Function
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.2.7
+          cache: true
+          cache-hash: ${{ hashFiles('supabase/functions/send-push/deno.json') }}
+      - name: Test delivery state machine
+        run: >-
+          deno test
+          --config supabase/functions/send-push/deno.json
+          --allow-env
+          supabase/functions/send-push/delivery_test.ts
+      - name: Type-check worker
+        run: >-
+          deno check
+          --config supabase/functions/send-push/deno.json
+          supabase/functions/send-push/index.ts
+
+  database-and-browser:
+    name: Database and browser
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Start local Supabase
+        run: pnpm exec supabase start
+      - name: Replay every migration
+        run: pnpm exec supabase db reset --local
+      - name: Lint database schema
+        run: >-
+          pnpm exec supabase db lint
+          --local --schema public
+          --level warning --fail-on warning
+      - name: Run pgTAP database tests
+        run: pnpm exec supabase test db
+      - name: Verify TypeScript and SQL scoring parity
+        run: node scripts/verify-match-score-parity.mjs
+      - name: Reject uncommitted schema drift
+        shell: bash
+        run: |
+          pnpm exec supabase db diff --local --schema public --output "$RUNNER_TEMP/schema.diff"
+          if grep -q '[^[:space:]]' "$RUNNER_TEMP/schema.diff"; then
+            cat "$RUNNER_TEMP/schema.diff"
+            echo "Schema differs from the committed migrations."
+            exit 1
+          fi
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      - name: Run notification browser tests
+        run: pnpm test:browser
+      - name: Upload browser failure artifacts
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: playwright-notification-artifacts
+          path: output/playwright/
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: Stop local Supabase
+        if: ${{ always() }}
+        run: pnpm exec supabase stop --no-backup

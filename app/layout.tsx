@@ -1,14 +1,9 @@
 import type { Metadata, Viewport } from 'next'
-import { Inter, Poppins, Lora } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { HuddleProvider } from '@/lib/store/huddle-store'
 import { RegisterServiceWorker } from '@/components/pwa/register-sw'
 import { Toaster } from 'sonner'
 import './globals.css'
-
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const poppins = Poppins({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'], variable: '--font-poppins' })
-const lora = Lora({ subsets: ['latin'], style: ['normal', 'italic'], variable: '--font-lora' })
 
 export const metadata: Metadata = {
   title: 'Huddle - Small Groups, Real Plans',
@@ -49,7 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark">
-      <body className={`${inter.variable} ${poppins.variable} ${lora.variable} font-sans antialiased`}>
+      <body className="font-sans antialiased">
         <HuddleProvider>
           {children}
           <RegisterServiceWorker />
