@@ -8,6 +8,7 @@ import {
   toHuddleProfile,
   toHuddleRsvp,
   toPulse,
+  toPulseResponseView,
   toSafetyFlag,
   toSafetyReport,
 } from "@/lib/supabase/mappers"
@@ -21,6 +22,7 @@ import type {
   HuddleProfile,
   HuddleRsvp,
   Pulse,
+  PulseResponseView,
   SafetyFlag,
   SafetyReport,
 } from "@/lib/types/huddle"
@@ -166,4 +168,20 @@ export async function fetchMessageById(
 
   throwOnError(error, "Could not load message")
   return data ? toChatMessage(data) : null
+}
+
+export async function fetchOwnPulseResponse(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+  userId: string,
+): Promise<PulseResponseView | null> {
+  const { data, error } = await supabase
+    .from("pulses")
+    .select("*")
+    .eq("activity_id", activityId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  throwOnError(error, "Could not load your private response")
+  return data ? toPulseResponseView(data) : null
 }

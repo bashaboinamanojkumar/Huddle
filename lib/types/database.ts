@@ -1,5 +1,3 @@
-// Generated from the local Supabase schema. Regenerate after every migration rather than
-// editing by hand.
 export type Json =
   | string
   | number
@@ -9,6 +7,31 @@ export type Json =
   | Json[]
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       activities: {
@@ -774,6 +797,26 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      activity_match_score: {
+        Args: { p_activity_id: string; p_user_id: string }
+        Returns: Database["public"]["CompositeTypes"]["activity_match_score_result"]
+        SetofOptions: {
+          from: "*"
+          to: "activity_match_score_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      activity_match_score_at: {
+        Args: { p_activity_id: string; p_now: string; p_user_id: string }
+        Returns: Database["public"]["CompositeTypes"]["activity_match_score_result"]
+        SetofOptions: {
+          from: "*"
+          to: "activity_match_score_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       can_view_activity: { Args: { p_activity_id: string }; Returns: boolean }
       claim_notification_deliveries: {
         Args: { p_lease_seconds?: number; p_limit?: number }
@@ -925,6 +968,46 @@ export type Database = {
         Args: { p_percentage: number; p_user_id: string }
         Returns: boolean
       }
+      produce_activity_match_digests: {
+        Args: { p_now?: string }
+        Returns: Database["public"]["CompositeTypes"]["notification_producer_result"]
+        SetofOptions: {
+          from: "*"
+          to: "notification_producer_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      produce_event_reminders: {
+        Args: { p_now?: string }
+        Returns: Database["public"]["CompositeTypes"]["notification_producer_result"]
+        SetofOptions: {
+          from: "*"
+          to: "notification_producer_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      produce_pulse_prompts: {
+        Args: { p_now?: string }
+        Returns: Database["public"]["CompositeTypes"]["notification_producer_result"]
+        SetofOptions: {
+          from: "*"
+          to: "notification_producer_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      produce_weekly_recaps: {
+        Args: { p_now?: string }
+        Returns: Database["public"]["CompositeTypes"]["notification_producer_result"]
+        SetofOptions: {
+          from: "*"
+          to: "notification_producer_result"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       record_notification_delivery_result: {
         Args: {
           p_claim_token: string
@@ -1020,6 +1103,37 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      submit_pulse_response: {
+        Args: { p_activity_id: string; p_did_meet: boolean; p_rating?: number }
+        Returns: {
+          activity_id: string
+          created_at: string
+          did_meet: boolean
+          id: string
+          rating: number | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "pulses"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      try_create_notification: {
+        Args: {
+          p_body: string
+          p_data: Json
+          p_dedupe_key: string
+          p_last_event_at?: string
+          p_reopen?: boolean
+          p_title: string
+          p_type: Database["public"]["Enums"]["notification_type"]
+          p_url: string
+          p_user_id: string
+        }
+        Returns: boolean
       }
       update_notification_preferences: {
         Args: {
@@ -1145,6 +1259,10 @@ export type Database = {
         | "other"
     }
     CompositeTypes: {
+      activity_match_score_result: {
+        total: number | null
+        eligible: boolean | null
+      }
       notification_delivery_claim: {
         delivery_id: string | null
         claim_token: string | null
@@ -1161,6 +1279,13 @@ export type Database = {
         category: Database["public"]["Enums"]["notification_category"] | null
         unread_badge_count: number | null
         attempt_count: number | null
+      }
+      notification_producer_result: {
+        scanned: number | null
+        created: number | null
+        deduped: number | null
+        failed: number | null
+        skipped: number | null
       }
     }
   }
@@ -1284,6 +1409,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       activity_source: ["seeded", "org", "user"],

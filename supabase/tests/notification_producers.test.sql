@@ -851,6 +851,160 @@ select results_eq(
   'all four producer schedules are installed exactly once'
 );
 
+-- Pulse responses are private, one-shot, and written only through a narrow RPC.
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"81000000-0000-4000-8000-000000000002","app_metadata":{"role":"student"}}',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$
+    select activity_id, user_id, did_meet, rating
+    from public.submit_pulse_response(
+      '82000000-0000-4000-8000-000000000001', true, 5
+    )
+  $$,
+  $$
+    values (
+      '82000000-0000-4000-8000-000000000001'::uuid,
+      '81000000-0000-4000-8000-000000000002'::uuid,
+      true,
+      5::smallint
+    )
+  $$,
+  'a going attendee can submit a rated pulse response'
+);
+
+select results_eq(
+  $$
+    with replay as (
+      select *
+      from public.submit_pulse_response(
+        '82000000-0000-4000-8000-000000000001', true, 5
+      )
+    )
+    select replay.id = stored.id, replay.created_at = stored.created_at
+    from replay
+    join public.pulses stored
+      on stored.activity_id = replay.activity_id and stored.user_id = replay.user_id
+  $$,
+  $$values (true, true)$$,
+  'an identical pulse replay returns the original immutable row'
+);
+
+select throws_ok(
+  $$
+    select public.submit_pulse_response(
+      '82000000-0000-4000-8000-000000000001', false, 5
+    )
+  $$,
+  '22023'::char(5),
+  'Pulse response already submitted with different values',
+  'a conflicting pulse replay is rejected'
+);
+
+select throws_ok(
+  $$
+    select public.submit_pulse_response(
+      '82000000-0000-4000-8000-000000000001', true, 0
+    )
+  $$,
+  '22023'::char(5),
+  'Pulse rating must be between 1 and 5',
+  'pulse ratings outside one through five are rejected'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"81000000-0000-4000-8000-000000000007","app_metadata":{"role":"student"}}',
+  true
+);
+set local role authenticated;
+
+select throws_ok(
+  $$
+    select public.submit_pulse_response(
+      '82000000-0000-4000-8000-000000000001', true, null
+    )
+  $$,
+  '42501'::char(5),
+  'Only going attendees can submit a pulse response',
+  'a non-attendee cannot submit a pulse response'
+);
+
+select results_eq(
+  $$select count(*)::integer from public.pulses$$,
+  $$values (0)$$,
+  'RLS prevents another user from reading the stored pulse response'
+);
+
+reset role;
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"81000000-0000-4000-8000-000000000003","app_metadata":{"role":"student"}}',
+  true
+);
+set local role authenticated;
+
+select results_eq(
+  $$
+    select did_meet, rating is null
+    from public.submit_pulse_response(
+      '82000000-0000-4000-8000-000000000001', false, null
+    )
+  $$,
+  $$values (false, true)$$,
+  'an eligible attendee may submit an unrated response'
+);
+
+select results_eq(
+  $$
+    select user_id, did_meet, rating
+    from public.pulses
+    order by created_at
+  $$,
+  $$
+    values (
+      '81000000-0000-4000-8000-000000000003'::uuid,
+      false,
+      null::smallint
+    )
+  $$,
+  'owners can select only their own pulse response'
+);
+
+reset role;
+
+select results_eq(
+  $$
+    select
+      bool_or(pg_catalog.has_column_privilege('authenticated', 'public.pulses', column_name, 'INSERT')),
+      bool_or(pg_catalog.has_column_privilege('authenticated', 'public.pulses', column_name, 'UPDATE'))
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'pulses'
+  $$,
+  $$values (false, false)$$,
+  'authenticated users have no direct pulse insert or update column grants'
+);
+
+select results_eq(
+  $$
+    select proc.prosecdef,
+           coalesce(proc.proconfig, '{}'::text[]) @> array['search_path=""'],
+           pg_catalog.has_function_privilege('authenticated', proc.oid, 'execute'),
+           pg_catalog.has_function_privilege('anon', proc.oid, 'execute')
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'public'
+      and proc.proname = 'submit_pulse_response'
+  $$,
+  $$values (true, true, true, false)$$,
+  'the pulse RPC uses fixed-path definer rights and authenticated-only execution'
+);
+
 select results_eq(
   $$
     select count(*)::integer
