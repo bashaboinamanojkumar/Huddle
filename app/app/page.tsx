@@ -95,23 +95,22 @@ export default function FeedPage() {
     <div className="min-h-full bg-background">
       <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm">
-                <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
-              </div>
-              <HuddleWordmark className="text-white text-xl" />
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 border border-white/10">
+              <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
             </div>
-            <h1 className="font-heading text-3xl font-black leading-none text-white">
-              Hey, {currentProfile.firstName} 👋
-            </h1>
-            <p className="mt-1 text-sm text-white/62">Discover events, connect with people, and huddle up together.</p>
+            <div>
+              <HuddleWordmark className="text-white text-xl" />
+              <h1 className="font-heading text-xl font-black leading-none text-white">
+                Hey, {currentProfile.firstName} 👋
+              </h1>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={invite}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-white"
               aria-label="Invite friends"
             >
               <Share2 className="h-5 w-5" />
@@ -128,15 +127,15 @@ export default function FeedPage() {
         </div>
 
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{attendingActivities.length}</p>
             <p className="text-[11px] text-white/62">attending</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.streakDays}</p>
             <p className="text-[11px] text-white/62">day streak</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.points}</p>
             <p className="text-[11px] text-white/62">points</p>
           </div>

@@ -144,7 +144,7 @@ export default function CommunityPage() {
               className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
                 category === "all"
                   ? "border-secondary bg-secondary/18"
-                  : "border-white/10 bg-white/6"
+                  : "border-white/10 bg-white/8"
               }`}
             >
               <span className="text-2xl">✦</span>
@@ -159,7 +159,7 @@ export default function CommunityPage() {
                 className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
                   category === item.id
                     ? "border-secondary bg-secondary/18"
-                    : "border-white/10 bg-white/6"
+                    : "border-white/10 bg-white/8"
                 }`}
               >
                 <CategoryIcon
