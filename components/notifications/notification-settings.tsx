@@ -209,7 +209,15 @@ export function NotificationSettingsView({
 }
 
 export function NotificationSettings() {
-  const { preferences, runtime, savePreferences } = useNotifications()
+  const {
+    preferences,
+    runtime,
+    savePreferences,
+    currentDeviceEnabled,
+    pushBusy,
+    enablePush,
+    disablePush,
+  } = useNotifications()
   const [draft, setDraft] = useState(preferences)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -239,19 +247,26 @@ export function NotificationSettings() {
     <NotificationSettingsView
       preferences={draft}
       runtime={runtime}
-      saving={saving}
+      saving={saving || pushBusy}
       saved={saved}
       error={error}
-      currentDeviceEnabled={false}
-      deviceControlAvailable={false}
+      currentDeviceEnabled={currentDeviceEnabled}
+      deviceControlAvailable={true}
       onChange={(next) => {
         setDraft(next)
         setSaved(false)
       }}
       onSave={() => void save()}
-      onEnableDevice={() => undefined}
-      onDisableDevice={() => undefined}
+      onEnableDevice={() => void enablePush().then((permission) => {
+        if (permission === "denied") {
+          setError("Push is blocked in this browser’s site settings.")
+        }
+      }).catch((caught) => {
+        setError(caught instanceof Error ? caught.message : "Could not enable Push")
+      })}
+      onDisableDevice={() => void disablePush().catch((caught) => {
+        setError(caught instanceof Error ? caught.message : "Could not disable Push")
+      })}
     />
   )
 }
-

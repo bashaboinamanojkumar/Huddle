@@ -6,7 +6,7 @@ import { PhoneFrame } from "@/components/layout/phone-frame"
 import { SessionGuard } from "@/components/auth/session-guard"
 import { NotificationProvider } from "@/lib/notifications/notification-provider"
 
-import { IosInstallBanner } from "@/components/app/ios-install-banner"
+import { PromptCoordinator } from "@/components/pwa/prompt-coordinator"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -20,7 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="shrink-0">
             <BottomNav />
           </div>
-          <IosInstallBanner />
+          <PromptCoordinator />
         </NotificationProvider>
       </SessionGuard>
     </PhoneFrame>

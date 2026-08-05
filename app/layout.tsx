@@ -3,7 +3,6 @@ import { Inter, Poppins, Lora } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { HuddleProvider } from '@/lib/store/huddle-store'
 import { RegisterServiceWorker } from '@/components/pwa/register-sw'
-import { InstallPrompt } from '@/components/pwa/install-prompt'
 import { Toaster } from 'sonner'
 import './globals.css'
 
@@ -54,7 +53,6 @@ export default function RootLayout({
         <HuddleProvider>
           {children}
           <RegisterServiceWorker />
-          <InstallPrompt />
           <Analytics />
           <Toaster position="top-center" richColors />
         </HuddleProvider>

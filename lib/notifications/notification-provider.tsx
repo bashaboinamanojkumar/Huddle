@@ -22,6 +22,13 @@ import {
 } from "@/lib/notifications/api"
 import { countUnread } from "@/lib/notifications/model"
 import {
+  PUSH_SUBSCRIPTION_CHANGED_EVENT,
+  currentBrowserPushSubscription,
+  disablePushForCurrentBrowser,
+  enablePushForCurrentBrowser,
+  reconcileBrowserPushSubscription,
+} from "@/lib/notifications/push"
+import {
   createNotificationState,
   notificationReducer,
   shouldShowArrivalToast,
@@ -46,11 +53,15 @@ interface NotificationContextValue {
   unreadChatCount: number
   preferences: NotificationPreferences | null
   runtime: NotificationRuntimeConfig | null
+  currentDeviceEnabled: boolean
+  pushBusy: boolean
   loadMore(): Promise<void>
   retry(): void
   markRead(id: string): Promise<void>
   markAllRead(): Promise<void>
   savePreferences(preferences: NotificationPreferences): Promise<void>
+  enablePush(): Promise<NotificationPermission>
+  disablePush(): Promise<void>
 }
 
 const NotificationContext = createContext<NotificationContextValue | undefined>(undefined)
@@ -68,6 +79,8 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     createNotificationState,
   )
   const [runtime, setRuntime] = useState<NotificationRuntimeConfig | null>(null)
+  const [currentDeviceEnabled, setCurrentDeviceEnabled] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
   const activeUserRef = useRef(userId)
 
@@ -75,6 +88,44 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     activeUserRef.current = userId
     dispatch({ type: "user_reset", userId })
     setRuntime(null)
+    setCurrentDeviceEnabled(false)
+  }, [userId])
+
+  useEffect(() => {
+    if (!userId || typeof window === "undefined") return
+    let active = true
+    const supabase = createClient()
+    const vapidPublicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
+
+    const inspect = async (repair: boolean) => {
+      try {
+        if (repair && typeof Notification !== "undefined" && Notification.permission === "granted") {
+          await reconcileBrowserPushSubscription(supabase, vapidPublicKey)
+        }
+        const subscription = await currentBrowserPushSubscription()
+        if (active) setCurrentDeviceEnabled(Boolean(subscription))
+      } catch {
+        if (active) setCurrentDeviceEnabled(false)
+      }
+    }
+
+    const handleWorkerMessage = (event: MessageEvent<unknown>) => {
+      const data = event.data
+      if (typeof data === "object" && data !== null
+        && (data as { type?: unknown }).type === "PUSH_SUBSCRIPTION_CHANGED") {
+        void inspect(true)
+      }
+    }
+    const handleSubscriptionChange = () => void inspect(false)
+
+    void inspect(true)
+    navigator.serviceWorker?.addEventListener("message", handleWorkerMessage)
+    window.addEventListener(PUSH_SUBSCRIPTION_CHANGED_EVENT, handleSubscriptionChange)
+    return () => {
+      active = false
+      navigator.serviceWorker?.removeEventListener("message", handleWorkerMessage)
+      window.removeEventListener(PUSH_SUBSCRIPTION_CHANGED_EVENT, handleSubscriptionChange)
+    }
   }, [userId])
 
   useEffect(() => {
@@ -219,6 +270,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     dispatch({ type: "preferences_saved", preferences: saved })
   }, [userId])
 
+  const enablePush = useCallback(async () => {
+    setPushBusy(true)
+    try {
+      const permission = await enablePushForCurrentBrowser(
+        createClient(),
+        process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+      )
+      setCurrentDeviceEnabled(permission === "granted")
+      return permission
+    } finally {
+      setPushBusy(false)
+    }
+  }, [])
+
+  const disablePush = useCallback(async () => {
+    setPushBusy(true)
+    try {
+      await disablePushForCurrentBrowser(createClient())
+      setCurrentDeviceEnabled(false)
+    } finally {
+      setPushBusy(false)
+    }
+  }, [])
+
   const value = useMemo<NotificationContextValue>(() => ({
     items: state.items,
     status: state.status,
@@ -229,17 +304,25 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
     unreadChatCount: unread.chat,
     preferences: state.preferences,
     runtime,
+    currentDeviceEnabled,
+    pushBusy,
     loadMore,
     retry,
     markRead,
     markAllRead,
     savePreferences,
+    enablePush,
+    disablePush,
   }), [
+    currentDeviceEnabled,
+    disablePush,
+    enablePush,
     loadMore,
     markAllRead,
     markRead,
     retry,
     runtime,
+    pushBusy,
     savePreferences,
     state.error,
     state.hasMore,
@@ -265,4 +348,3 @@ export function useNotifications(): NotificationContextValue {
   }
   return context
 }
-
