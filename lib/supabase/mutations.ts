@@ -3,6 +3,7 @@ import {
   toChatMessage,
   toFriendConnection,
   toHuddleActivity,
+  toPulseResponseView,
   toSafetyReport,
 } from "@/lib/supabase/mappers"
 import { throwOnError } from "@/lib/supabase/queries"
@@ -14,6 +15,7 @@ import type {
   FriendConnection,
   HuddleActivity,
   HuddleProfile,
+  PulseResponseView,
   RsvpStatus,
   SafetyReport,
   UniversityId,
@@ -294,4 +296,21 @@ export async function declineFriend(
     .eq("id", connectionId)
 
   throwOnError(error, "Could not decline the friend request")
+}
+
+export async function submitPulseResponse(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+  didMeet: boolean,
+  rating: number | null,
+): Promise<PulseResponseView> {
+  const args = rating === null
+    ? { p_activity_id: activityId, p_did_meet: didMeet }
+    : { p_activity_id: activityId, p_did_meet: didMeet, p_rating: rating }
+  const { data, error } = await supabase.rpc("submit_pulse_response", args)
+
+  throwOnError(error, "Could not save your private response")
+  if (!data) throw new Error("Could not save your private response")
+
+  return toPulseResponseView(data)
 }

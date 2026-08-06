@@ -1,21 +1,28 @@
 "use client"
 
 import { BottomNav } from "@/components/app/bottom-nav"
+import { AppHeader } from "@/components/app/app-header"
 import { PhoneFrame } from "@/components/layout/phone-frame"
 import { SessionGuard } from "@/components/auth/session-guard"
+import { NotificationProvider } from "@/lib/notifications/notification-provider"
 
-import { IosInstallBanner } from "@/components/app/ios-install-banner"
+import { PromptCoordinator } from "@/components/pwa/prompt-coordinator"
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PhoneFrame>
-      <main className="min-h-0 flex-1 overflow-y-auto pb-20">
-        <SessionGuard>{children}</SessionGuard>
-      </main>
-      <div className="shrink-0">
-        <BottomNav />
-      </div>
-      <IosInstallBanner />
+      <SessionGuard>
+        <NotificationProvider>
+          <AppHeader />
+          <main className="min-h-0 flex-1 overflow-y-auto pb-20">
+            {children}
+          </main>
+          <div className="shrink-0">
+            <BottomNav />
+          </div>
+          <PromptCoordinator />
+        </NotificationProvider>
+      </SessionGuard>
     </PhoneFrame>
   )
 }

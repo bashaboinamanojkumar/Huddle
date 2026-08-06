@@ -8,6 +8,7 @@ import { toast } from "sonner"
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { formatActivityDate, formatActivityTime, getCategoryMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
+import { RSVP_SUCCESS_EVENT } from "@/lib/notifications/push"
 
 export default function ActivityDetailPage() {
   const params = useParams<{ id: string }>()
@@ -48,6 +49,7 @@ export default function ActivityDetailPage() {
 
       const status = await rsvpActivity(activity.id)
       if (status === "going") {
+        window.dispatchEvent(new Event(RSVP_SUCCESS_EVENT))
         toast.success("Spot is yours!")
         setShowRipple(true)
         setTimeout(() => setShowRipple(false), 1500)

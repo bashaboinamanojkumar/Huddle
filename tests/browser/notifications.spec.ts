@@ -1,0 +1,127 @@
+import { expect, test, type Page } from "@playwright/test"
+import {
+  DETAIL_ACTIVITY_ID,
+  FIXTURE_EMAIL,
+  FIXTURE_PASSWORD,
+  INELIGIBLE_ACTIVITY_ID,
+  RSVP_ACTIVITY_ID,
+} from "./fixture"
+
+async function signIn(page: Page): Promise<void> {
+  await page.goto("/verify")
+  await page.getByLabel("Campus email").fill(FIXTURE_EMAIL)
+  await page.getByLabel("Password").fill(FIXTURE_PASSWORD)
+  await page.getByRole("button", { name: "Sign in" }).click()
+  await page.waitForURL(/\/app(?:$|\/)/u)
+  await expect(page.getByRole("link", { name: "Huddle home" })).toBeVisible()
+}
+
+test.describe.configure({ mode: "serial" })
+
+test("inbox unread state, mark-all, and validated deep link", async ({ page }) => {
+  await signIn(page)
+  await expect(page.getByRole("link", { name: "Notifications, 2 unread" })).toBeVisible()
+  await page.getByRole("link", { name: "Notifications, 2 unread" }).click()
+
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible()
+  await expect(page.getByRole("heading", { name: "Today" })).toBeVisible()
+  await expect(page.getByText("Browser activity update")).toBeVisible()
+  await page.getByRole("button", { name: "Mark all read" }).click()
+  await expect(page.getByRole("link", { name: "Notifications, 0 unread" })).toBeVisible()
+
+  await page.getByRole("button", { name: /Browser activity update/u }).click()
+  await expect(page).toHaveURL(new RegExp(`/app/activity/${DETAIL_ACTIVITY_ID}$`, "u"))
+  await expect(page.getByRole("heading", { name: "Browser Detail Huddle" })).toBeVisible()
+})
+
+test("settings expose production defaults and persist changes", async ({ page }) => {
+  await signIn(page)
+  await page.goto("/app/settings")
+
+  await expect(page.getByRole("heading", { name: "Push notifications" })).toBeVisible()
+  await expect(page.getByRole("textbox", { name: "Start", exact: true })).toHaveValue("22:00")
+  await expect(page.getByRole("textbox", { name: "End", exact: true })).toHaveValue("08:00")
+  await expect(page.getByLabel("Daily Push cap")).toHaveValue("6")
+  await expect(page.getByText("Rewards", { exact: true })).toHaveCount(0)
+  await expect(page.getByRole("button", { name: "Enable on this device" })).toBeVisible()
+
+  await page.getByLabel("Daily Push cap").fill("7")
+  await page.getByRole("button", { name: "Save settings" }).click()
+  await expect(page.getByRole("status")).toContainText("Settings saved")
+})
+
+test("eligible pulse is stored once and remains immutable after refresh", async ({ page }) => {
+  await signIn(page)
+  await page.goto(`/app/activity/${DETAIL_ACTIVITY_ID}/pulse`)
+
+  await expect(page.getByText("Did you meet up with your Huddle?")).toBeVisible()
+  await page.getByRole("button", { name: "Yes" }).click()
+  await page.getByLabel("Optional rating").selectOption("5")
+  await page.getByRole("button", { name: "Submit response" }).click()
+  await expect(page.getByText(/response is saved/u)).toBeVisible()
+  await expect(page.getByText("Rating: 5/5")).toBeVisible()
+
+  await page.reload()
+  await expect(page.getByText(/response is saved/u)).toBeVisible()
+  await expect(page.getByRole("button", { name: "Submit response" })).toHaveCount(0)
+})
+
+test("ineligible pulse hides submission controls", async ({ page }) => {
+  await signIn(page)
+  await page.goto(`/app/activity/${INELIGIBLE_ACTIVITY_ID}/pulse`)
+  await expect(page.getByText(/only available to people who joined/u)).toBeVisible()
+  await expect(page.getByRole("button", { name: "Submit response" })).toHaveCount(0)
+})
+
+test("first successful RSVP exposes the privacy-first Push explanation", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Notification, "permission", {
+      configurable: true,
+      get: () => "default" satisfies NotificationPermission,
+    })
+  })
+  await signIn(page)
+  await page.goto(`/app/activity/${RSVP_ACTIVITY_ID}`)
+  await page.getByRole("button", { name: "Huddle up" }).click()
+  await expect(page.getByText("Get Huddle alerts")).toBeVisible()
+  await expect(page.getByText(/privacy-safe reminders and updates/u)).toBeVisible()
+})
+
+test.describe("iOS install-first branch", () => {
+  test.use({
+    userAgent:
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 Version/17.5 Mobile/15E148 Safari/604.1",
+    viewport: { width: 390, height: 844 },
+  })
+
+  test("does not request permission and shows installation guidance", async ({ page }) => {
+    await page.addInitScript(() => {
+      localStorage.setItem("huddle.push.rsvpEligibleAt", new Date().toISOString())
+      Object.defineProperty(window, "__notificationRequestCount", {
+        value: 0,
+        writable: true,
+      })
+      if ("Notification" in window) {
+        Object.defineProperty(Notification, "requestPermission", {
+          configurable: true,
+          value: async () => {
+            ;(window as typeof window & { __notificationRequestCount: number })
+              .__notificationRequestCount += 1
+            return "default" as NotificationPermission
+          },
+        })
+      }
+    })
+
+    await signIn(page)
+    await expect(page.getByText("Install Huddle", { exact: true })).toBeVisible()
+    await expect(page.getByText(/Install Huddle before enabling Push/u)).toBeVisible()
+    await expect(page.getByText("Open Huddle in Safari.")).toBeVisible()
+    expect(
+      await page.evaluate(() =>
+        (window as typeof window & { __notificationRequestCount: number })
+          .__notificationRequestCount
+      ),
+    ).toBe(0)
+  })
+})
