@@ -799,20 +799,22 @@ select results_eq(
 select results_eq(
   $$
     select total, eligible
-    from public.activity_match_score(
+    from public.activity_match_score_at(
       '81000000-0000-4000-8000-000000000008',
-      '89000000-0000-4000-8000-000000000003'
+      '89000000-0000-4000-8000-000000000003',
+      '2026-08-04 21:00:00+00'
     )
   $$,
   $$values (100, true)$$,
-  'SQL match scoring mirrors exact interest availability and comfort weights'
+  'SQL match scoring at a fixed instant mirrors exact interest availability and comfort weights'
 );
 select results_eq(
   $$
     select total, eligible
-    from public.activity_match_score(
+    from public.activity_match_score_at(
       '81000000-0000-4000-8000-000000000008',
-      '89000000-0000-4000-8000-000000000004'
+      '89000000-0000-4000-8000-000000000004',
+      '2026-08-04 21:00:00+00'
     )
   $$,
   $$values (100, false)$$,
@@ -820,14 +822,20 @@ select results_eq(
 );
 select results_eq(
   $$
-    select total, eligible
+    select wrapper.total = explicit.total,
+           wrapper.eligible = explicit.eligible
     from public.activity_match_score(
       '81000000-0000-4000-8000-000000000001',
       '82000000-0000-4000-8000-000000000001'
-    )
+    ) wrapper
+    cross join public.activity_match_score_at(
+      '81000000-0000-4000-8000-000000000001',
+      '82000000-0000-4000-8000-000000000001',
+      now()
+    ) explicit
   $$,
-  $$values (100, true)$$,
-  'the public score wrapper keeps a non-joined host eligible'
+  $$values (true, true)$$,
+  'the public score wrapper delegates to current-time scoring'
 );
 
 select results_eq(
