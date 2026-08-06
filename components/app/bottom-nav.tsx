@@ -2,16 +2,16 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarHeart, MessageCircle, Plus, Trophy, UserRound } from "lucide-react"
+import { FeedIcon, CommunityIcon, HostIcon, ChatsIcon, ProfileIcon } from "@/components/huddle/huddle-icons"
 import { cn } from "@/lib/utils"
 import { useNotifications } from "@/lib/notifications/notification-provider"
 
 const tabs = [
-  { href: "/app", label: "Feed", icon: CalendarHeart },
-  { href: "/app/community", label: "Community", icon: Trophy },
-  { href: "/app/host", label: "Host", icon: Plus, center: true },
-  { href: "/app/chats", label: "Chats", icon: MessageCircle },
-  { href: "/app/profile", label: "Profile", icon: UserRound },
+  { href: "/app", label: "Feed", icon: FeedIcon },
+  { href: "/app/community", label: "Community", icon: CommunityIcon },
+  { href: "/app/host", label: "Host", icon: HostIcon, center: true },
+  { href: "/app/chats", label: "Chats", icon: ChatsIcon },
+  { href: "/app/profile", label: "Profile", icon: ProfileIcon },
 ]
 
 export function BottomNav() {
