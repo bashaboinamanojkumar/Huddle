@@ -146,6 +146,11 @@ select lives_ok(
             push_rollout_percentage = 100
         where id;
 
+        update public.notification_preferences
+        set quiet_hours_start = null,
+            quiet_hours_end = null
+        where user_id = '71000000-0000-4000-8000-000000000001';
+
         insert into public.push_subscriptions (
           id, user_id, endpoint, p256dh, auth
         )

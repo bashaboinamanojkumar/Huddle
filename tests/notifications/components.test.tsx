@@ -8,6 +8,10 @@ import {
   NotificationSettingsView,
 } from "@/components/notifications/notification-settings"
 import {
+  NotificationInboxSettingsLink,
+  ProfileNotificationSettingsSection,
+} from "@/components/notifications/notification-settings-navigation"
+import {
   NotificationOperationsPanel,
   parseNotificationOperations,
 } from "@/components/notifications/notification-operations"
@@ -187,6 +191,25 @@ describe("notification operations", () => {
     expect(html).toContain("Active subscriptions")
     expect(html).toContain("http_410")
     expect(html).not.toContain("must-not-render")
+  })
+})
+
+describe("notification settings navigation", () => {
+  it("renders the Profile settings card with descriptive link text", () => {
+    const html = renderToStaticMarkup(<ProfileNotificationSettingsSection />)
+
+    expect(html).toContain('aria-labelledby="notification-settings-heading"')
+    expect(html).toContain('href="/app/settings"')
+    expect(html).toContain("Notification settings")
+    expect(html).toContain("Push, quiet hours, and device controls")
+  })
+
+  it("renders an accessible 44-pixel inbox shortcut", () => {
+    const html = renderToStaticMarkup(<NotificationInboxSettingsLink />)
+
+    expect(html).toContain('href="/app/settings"')
+    expect(html).toContain('aria-label="Notification settings"')
+    expect(html).toContain("h-11 w-11")
   })
 })
 
