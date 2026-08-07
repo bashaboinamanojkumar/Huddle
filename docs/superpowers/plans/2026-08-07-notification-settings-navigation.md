@@ -198,7 +198,7 @@ test("settings are discoverable from Profile and Notifications", async ({ page }
 Ensure local Supabase is running, then run:
 
 ```powershell
-pnpm exec playwright test tests/browser/notifications.spec.ts --grep "settings are discoverable"
+pnpm exec playwright test notifications.spec.ts --grep "settings are discoverable"
 ```
 
 Expected: FAIL on the missing Profile `Notification settings` link.
@@ -242,7 +242,7 @@ Replace the page header with:
 Run:
 
 ```powershell
-pnpm exec playwright test tests/browser/notifications.spec.ts --grep "settings are discoverable"
+pnpm exec playwright test notifications.spec.ts --grep "settings are discoverable"
 ```
 
 Expected: PASS at the 390 by 844 viewport. Both links reach `/app/settings`, the settings controls render, Profile still has five bottom-navigation links, and neither page has horizontal overflow.
@@ -299,7 +299,7 @@ Expected: the optimized Next.js build succeeds and includes `/app/profile`, `/ap
 Ensure local Supabase is running, then run:
 
 ```powershell
-pnpm exec playwright test tests/browser/notifications.spec.ts
+pnpm exec playwright test notifications.spec.ts
 ```
 
 Expected: every notification browser test passes in Chromium.

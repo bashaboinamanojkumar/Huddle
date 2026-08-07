@@ -34,6 +34,43 @@ test("inbox unread state, mark-all, and validated deep link", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Browser Detail Huddle" })).toBeVisible()
 })
 
+test("settings are discoverable from Profile and Notifications", async ({ page }) => {
+  await signIn(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+
+  await page.goto("/app/profile")
+  const profileSettings = page.getByRole("link", {
+    name: /Notification settings Push, quiet hours, and device controls/u,
+  })
+  await expect(profileSettings).toBeVisible()
+  await expect(page.getByRole("navigation").getByRole("link")).toHaveCount(5)
+  await expect.poll(() =>
+    page.evaluate(() =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    )
+  ).toBe(true)
+
+  await profileSettings.click()
+  await expect(page).toHaveURL(/\/app\/settings$/u)
+  await expect(page.getByRole("heading", { name: "Push notifications" })).toBeVisible()
+
+  await page.goto("/app/notifications")
+  const inboxSettings = page.getByRole("link", {
+    name: "Notification settings",
+    exact: true,
+  })
+  await expect(inboxSettings).toBeVisible()
+  await expect.poll(() =>
+    page.evaluate(() =>
+      document.documentElement.scrollWidth <= document.documentElement.clientWidth
+    )
+  ).toBe(true)
+
+  await inboxSettings.click()
+  await expect(page).toHaveURL(/\/app\/settings$/u)
+  await expect(page.getByRole("heading", { name: "Push notifications" })).toBeVisible()
+})
+
 test("settings expose production defaults and persist changes", async ({ page }) => {
   await signIn(page)
   await page.goto("/app/settings")
