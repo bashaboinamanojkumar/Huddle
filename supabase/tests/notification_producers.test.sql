@@ -63,7 +63,7 @@ values
   (
     '82000000-0000-4000-8000-000000000002', 'Second Seat', 'coffee',
     'notification-producer-fixture', '81000000-0000-4000-8000-000000000001',
-    4, '2026-08-07 17:00:00+00', 'weekday_afternoon', 'seeded', 'approved',
+    4, current_timestamp + interval '3 days', 'weekday_afternoon', 'seeded', 'approved',
     'umd', '2026-08-04 12:00:00+00', '2026-08-04 12:00:00+00'
   ),
   (
