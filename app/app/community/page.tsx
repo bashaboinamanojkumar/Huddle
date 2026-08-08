@@ -2,12 +2,12 @@
 
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { EventsMap } from "@/components/huddle/events-map"
-import { List, Map as MapIcon } from "lucide-react"
+import { List, Map as MapIcon, Search, ShieldAlert } from "lucide-react"
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Bell, Search, ShieldAlert } from "lucide-react"
 import { ActivityCard } from "@/components/huddle/activity-card"
 import { HuddleWordmark } from "@/components/huddle/huddle-icons"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 import { useHuddle } from "@/lib/store/huddle-store"
 import { categoryMeta } from "@/lib/data/metadata"
@@ -51,18 +51,21 @@ export default function CommunityPage() {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 border border-white/10">
-              <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
+              <img src="/huddle-icon.png" alt="" className="h-10 w-10 object-contain" />
             </div>
             <HuddleWordmark className="text-white text-lg" />
           </div>
-          <Link
-            href="/app/profile"
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
-            style={{ backgroundColor: currentProfile.photoColor }}
-            aria-label="Open profile"
-          >
-            {currentProfile.displayName.charAt(0)}
-          </Link>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <Link
+              href="/app/profile"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              style={{ backgroundColor: currentProfile.photoColor }}
+              aria-label="Open profile"
+            >
+              {currentProfile.displayName.charAt(0)}
+            </Link>
+          </div>
         </div>
 
         <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
@@ -95,7 +98,6 @@ export default function CommunityPage() {
             placeholder="Search activities or locations"
             className="min-h-11 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
           />
-          <Bell className="h-5 w-5 text-white/48" />
         </div>
       </header>
 

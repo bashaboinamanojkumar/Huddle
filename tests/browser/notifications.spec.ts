@@ -13,28 +13,30 @@ async function signIn(page: Page): Promise<void> {
   await page.getByLabel("Password").fill(FIXTURE_PASSWORD)
   await page.getByRole("button", { name: "Sign in" }).click()
   await page.waitForURL(/\/app(?:$|\/)/u)
-  await expect(page.getByRole("link", { name: "Huddle home" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Open profile" })).toBeVisible()
 }
 
 test.describe.configure({ mode: "serial" })
 
-test("feed uses one unified header and keeps Invite with Same wavelength", async ({ page }) => {
+test("Feed and Community expose only their approved header actions", async ({ page }) => {
   await signIn(page)
   await page.goto("/app")
 
-  const appHeader = page.getByRole("banner")
-  await expect(appHeader.getByRole("link", { name: "Huddle home" })).toBeVisible()
-  await expect(appHeader.getByRole("link", { name: /Notifications, \d+ unread/u })).toBeVisible()
-  await expect(appHeader.getByRole("link", { name: "Open profile" })).toBeVisible()
-  await expect(page.getByText("Huddle", { exact: true })).toHaveCount(1)
+  const feedHeader = page.locator("header").first()
+  await expect.poll(() =>
+    page.locator(".authenticated-main").evaluate((main) => getComputedStyle(main).paddingTop)
+  ).toBe("0px")
+  await expect(page.getByText(/^huddle$/iu)).toHaveCount(1)
+  await expect(page.getByRole("link", { name: "Huddle home" })).toHaveCount(0)
+  await expect(feedHeader.locator("a[aria-label], button[aria-label]")).toHaveCount(3)
+  expect(
+    await feedHeader.locator("a[aria-label], button[aria-label]").evaluateAll((actions) =>
+      actions.map((action) => action.getAttribute("aria-label")),
+    ),
+  ).toEqual(["Notifications, 2 unread", "Invite friends", "Open profile"])
   await expect(page.getByRole("heading", { name: "Hey, Browser 👋" })).toBeVisible()
 
-  const sameWavelengthHeader = page
-    .getByRole("heading", { name: "Same wavelength" })
-    .locator("..")
-    .locator("..")
-  await expect(sameWavelengthHeader.getByRole("button", { name: "Invite friends" })).toBeVisible()
-  await sameWavelengthHeader.getByRole("button", { name: "Invite friends" }).click()
+  await feedHeader.getByRole("button", { name: "Invite friends" }).click()
   await expect(page.getByText("Invite link copied for the pilot demo.")).toBeVisible()
 
   for (const width of [320, 390]) {
@@ -46,13 +48,43 @@ test("feed uses one unified header and keeps Invite with Same wavelength", async
     ).toBe(true)
   }
 
-  await appHeader.getByRole("link", { name: /Notifications, \d+ unread/u }).click()
+  await feedHeader.getByRole("link", { name: "Notifications, 2 unread" }).click()
   await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible()
+  await expect(page.getByRole("link", { name: "Huddle home" })).toHaveCount(0)
 
   await page.goto("/app")
-  await page.getByRole("banner").getByRole("link", { name: "Open profile" }).click()
+  await page.locator("header").first().getByRole("link", { name: "Open profile" }).click()
   await expect(page).toHaveURL(/\/app\/profile$/u)
   await expect(page.getByRole("heading", { name: /Browser/u })).toBeVisible()
+
+  await page.goto("/app/community")
+  const communityHeader = page.locator("header").first()
+  await expect.poll(() =>
+    page.locator(".authenticated-main").evaluate((main) => getComputedStyle(main).paddingTop)
+  ).toBe("0px")
+  await expect(page.getByText(/^huddle$/iu)).toHaveCount(1)
+  await expect(page.getByRole("link", { name: "Huddle home" })).toHaveCount(0)
+  await expect(communityHeader.locator("a[aria-label]")).toHaveCount(2)
+  expect(
+    await communityHeader.locator("a[aria-label]").evaluateAll((actions) =>
+      actions.map((action) => action.getAttribute("aria-label")),
+    ),
+  ).toEqual(["Notifications, 2 unread", "Open profile"])
+  await expect(
+    communityHeader.getByPlaceholder("Search activities or locations").locator("..").locator("svg"),
+  ).toHaveCount(1)
+
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 844 })
+    await expect.poll(() =>
+      page.evaluate(() =>
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true)
+  }
+
+  await communityHeader.getByRole("link", { name: "Notifications, 2 unread" }).click()
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible()
 })
 
 test("inbox unread state, mark-all, and validated deep link", async ({ page }) => {
@@ -63,9 +95,19 @@ test("inbox unread state, mark-all, and validated deep link", async ({ page }) =
   await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible()
   await expect(page.getByRole("heading", { name: "Today" })).toBeVisible()
   await expect(page.getByText("Browser activity update")).toBeVisible()
+  const markAllResponse = page.waitForResponse((response) =>
+    response.url().includes("/rpc/mark_all_notifications_read")
+      && response.request().method() === "POST"
+  )
   await page.getByRole("button", { name: "Mark all read" }).click()
+  await markAllResponse
+
+  await page.goto("/app")
+  await expect(page.getByRole("link", { name: "Notifications, 0 unread" })).toBeVisible()
+  await page.goto("/app/community")
   await expect(page.getByRole("link", { name: "Notifications, 0 unread" })).toBeVisible()
 
+  await page.goto("/app/notifications")
   await page.getByRole("button", { name: /Browser activity update/u }).click()
   await expect(page).toHaveURL(new RegExp(`/app/activity/${DETAIL_ACTIVITY_ID}$`, "u"))
   await expect(page.getByRole("heading", { name: "Browser Detail Huddle" })).toBeVisible()
@@ -76,6 +118,7 @@ test("settings are discoverable from Profile and Notifications", async ({ page }
   await page.setViewportSize({ width: 390, height: 844 })
 
   await page.goto("/app/profile")
+  await expect(page.getByRole("link", { name: "Huddle home" })).toHaveCount(0)
   const profileSettings = page.getByRole("link", {
     name: /Notification settings Push, quiet hours, and device controls/u,
   })
@@ -89,9 +132,14 @@ test("settings are discoverable from Profile and Notifications", async ({ page }
 
   await profileSettings.click()
   await expect(page).toHaveURL(/\/app\/settings$/u)
+  await expect(page.getByRole("link", { name: "Huddle home" })).toHaveCount(0)
+  await expect.poll(() =>
+    page.locator(".authenticated-main").evaluate((main) => getComputedStyle(main).paddingTop)
+  ).toBe("16px")
   await expect(page.getByRole("heading", { name: "Push notifications" })).toBeVisible()
 
   await page.goto("/app/notifications")
+  await expect(page.getByRole("link", { name: "Huddle home" })).toHaveCount(0)
   const inboxSettings = page.getByRole("link", {
     name: "Notification settings",
     exact: true,

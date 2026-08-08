@@ -168,6 +168,10 @@
   padding-top: max(1rem, env(safe-area-inset-top));
 }
 
+.authenticated-main:not(:has(.safe-pt)):not(:has(.ios-safe-pt)) {
+  padding-top: max(1rem, env(safe-area-inset-top));
+}
+
 .ios-safe-pt {
   padding-top: 1.25rem;
 }

@@ -4,8 +4,9 @@ import { useMemo } from "react"
 import Link from "next/link"
 import { ChevronRight, Share2, UserPlus } from "lucide-react"
 import { toast } from "sonner"
-import { FeedHero } from "@/components/app/feed-hero"
 import { ActivityCard } from "@/components/huddle/activity-card"
+import { HuddleWordmark } from "@/components/huddle/huddle-icons"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 import { useHuddle } from "@/lib/store/huddle-store"
 
 export default function FeedPage() {
@@ -84,12 +85,55 @@ export default function FeedPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <FeedHero
-        firstName={currentProfile.firstName}
-        attendingCount={attendingActivities.length}
-        streakDays={currentProfile.streakDays}
-        points={currentProfile.points}
-      />
+      <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/8">
+              <img src="/huddle-icon.png" alt="" className="h-10 w-10 object-contain" />
+            </div>
+            <HuddleWordmark className="text-lg text-white" />
+          </div>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <button
+              type="button"
+              onClick={invite}
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              aria-label="Invite friends"
+            >
+              <Share2 className="h-5 w-5" aria-hidden="true" />
+            </button>
+            <Link
+              href="/app/profile"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              style={{ backgroundColor: currentProfile.photoColor }}
+              aria-label="Open profile"
+            >
+              {currentProfile.displayName.charAt(0)}
+            </Link>
+          </div>
+        </div>
+
+        <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
+          Hey, {currentProfile.firstName} 👋
+        </h1>
+        <p className="mt-1 text-sm text-white/62">Good to see you. Here's what's happening.</p>
+
+        <div className="mt-5 grid grid-cols-3 gap-3">
+          <div className="rounded-3xl bg-white/8 p-3">
+            <p className="font-heading text-2xl font-black text-white">{attendingActivities.length}</p>
+            <p className="text-[11px] text-white/62">attending</p>
+          </div>
+          <div className="rounded-3xl bg-white/8 p-3">
+            <p className="font-heading text-2xl font-black text-white">{currentProfile.streakDays}</p>
+            <p className="text-[11px] text-white/62">day streak</p>
+          </div>
+          <div className="rounded-3xl bg-white/8 p-3">
+            <p className="font-heading text-2xl font-black text-white">{currentProfile.points}</p>
+            <p className="text-[11px] text-white/62">points</p>
+          </div>
+        </div>
+      </header>
 
       <main className="px-5 py-5 space-y-5">
         <section>
@@ -123,20 +167,9 @@ export default function FeedPage() {
         </section>
 
         <section>
-          <div className="mb-3 flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className="font-heading text-xl font-black text-white">Same wavelength</h2>
-              <p className="mt-1 text-xs text-white/46">{leaderboard.length} students</p>
-            </div>
-            <button
-              type="button"
-              onClick={invite}
-              className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-2xl bg-white/8 px-4 text-sm font-bold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary"
-              aria-label="Invite friends"
-            >
-              <Share2 className="h-4 w-4" aria-hidden="true" />
-              Invite
-            </button>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-heading text-xl font-black text-white">Same wavelength</h2>
+            <span className="text-xs text-white/46">{leaderboard.length} students</span>
           </div>
           <div className="glass-card rounded-[2rem] overflow-hidden">
             {leaderboard.filter((p) => !myFriendIds.has(p.userId)).slice(0, 5).map((profile, index) => {

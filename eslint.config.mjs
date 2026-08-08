@@ -8,6 +8,7 @@ export default [
       "node_modules/**",
       "output/playwright/**",
       "public/sw.js",
+      "supabase/.temp/**",
       "supabase/functions/**",
       "_docx_extracted.xml",
       "**/*.docx",
