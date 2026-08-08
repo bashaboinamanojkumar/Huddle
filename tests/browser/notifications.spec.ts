@@ -18,6 +18,43 @@ async function signIn(page: Page): Promise<void> {
 
 test.describe.configure({ mode: "serial" })
 
+test("feed uses one unified header and keeps Invite with Same wavelength", async ({ page }) => {
+  await signIn(page)
+  await page.goto("/app")
+
+  const appHeader = page.getByRole("banner")
+  await expect(appHeader.getByRole("link", { name: "Huddle home" })).toBeVisible()
+  await expect(appHeader.getByRole("link", { name: /Notifications, \d+ unread/u })).toBeVisible()
+  await expect(appHeader.getByRole("link", { name: "Open profile" })).toBeVisible()
+  await expect(page.getByText("Huddle", { exact: true })).toHaveCount(1)
+  await expect(page.getByRole("heading", { name: "Hey, Browser 👋" })).toBeVisible()
+
+  const sameWavelengthHeader = page
+    .getByRole("heading", { name: "Same wavelength" })
+    .locator("..")
+    .locator("..")
+  await expect(sameWavelengthHeader.getByRole("button", { name: "Invite friends" })).toBeVisible()
+  await sameWavelengthHeader.getByRole("button", { name: "Invite friends" }).click()
+  await expect(page.getByText("Invite link copied for the pilot demo.")).toBeVisible()
+
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: width === 320 ? 568 : 844 })
+    await expect.poll(() =>
+      page.evaluate(() =>
+        document.documentElement.scrollWidth <= document.documentElement.clientWidth
+      )
+    ).toBe(true)
+  }
+
+  await appHeader.getByRole("link", { name: /Notifications, \d+ unread/u }).click()
+  await expect(page.getByRole("heading", { name: "Notifications" })).toBeVisible()
+
+  await page.goto("/app")
+  await page.getByRole("banner").getByRole("link", { name: "Open profile" }).click()
+  await expect(page).toHaveURL(/\/app\/profile$/u)
+  await expect(page.getByRole("heading", { name: /Browser/u })).toBeVisible()
+})
+
 test("inbox unread state, mark-all, and validated deep link", async ({ page }) => {
   await signIn(page)
   await expect(page.getByRole("link", { name: "Notifications, 2 unread" })).toBeVisible()
