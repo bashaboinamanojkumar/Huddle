@@ -1,7 +1,6 @@
 "use client"
 
 import { BottomNav } from "@/components/app/bottom-nav"
-import { AppHeader } from "@/components/app/app-header"
 import { PhoneFrame } from "@/components/layout/phone-frame"
 import { SessionGuard } from "@/components/auth/session-guard"
 import { NotificationProvider } from "@/lib/notifications/notification-provider"
@@ -13,8 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <PhoneFrame>
       <SessionGuard>
         <NotificationProvider>
-          <AppHeader />
-          <main className="min-h-0 flex-1 overflow-y-auto pb-20">
+          <main className="authenticated-main min-h-0 flex-1 overflow-y-auto pb-20">
             {children}
           </main>
           <div className="shrink-0">
