@@ -19,12 +19,18 @@ export function AppViewportController() {
       const visualHeight = viewport
         ? viewport.height
         : Number.POSITIVE_INFINITY
-      const height = Math.max(0, Math.min(
-        visualHeight,
+      const layoutHeight = Math.max(0, Math.min(
         window.innerHeight,
         document.documentElement.clientHeight,
       ))
-      const top = Math.max(0, viewport ? viewport.offsetTop : 0)
+      const top = Math.min(
+        layoutHeight,
+        Math.max(0, viewport ? viewport.offsetTop : 0),
+      )
+      const height = Math.max(0, Math.min(
+        visualHeight,
+        layoutHeight - top,
+      ))
 
       root.style.setProperty(HEIGHT_PROPERTY, `${height}px`)
       root.style.setProperty(TOP_PROPERTY, `${top}px`)

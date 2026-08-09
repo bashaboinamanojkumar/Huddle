@@ -257,6 +257,30 @@ test("reload aligns confirmation and authenticated shells to the visible viewpor
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
 })
 
+test("a stale full height cannot extend below a non-zero visual offset", async ({ page }) => {
+  const storageKey = "bottom-nav-stale-height-and-offset"
+  await page.setViewportSize(mobileViewport)
+  await installVisualViewportMismatch(
+    page,
+    { height: 800, offsetTop: 36 },
+    storageKey,
+  )
+  await signIn(page)
+  await page.evaluate((key) => {
+    sessionStorage.setItem(key, "true")
+    window.visualViewport?.dispatchEvent(new Event("resize"))
+  }, storageKey)
+
+  await expect(page.locator(".phone-frame-height")).toHaveCSS("top", "36px")
+  await expect(page.locator(".phone-frame-height")).toHaveCSS("height", "764px")
+  const frameBounds = await page.locator(".phone-frame-height").evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return { top: rect.top, bottom: rect.bottom }
+  })
+  expect(frameBounds).toEqual({ top: 36, bottom: 800 })
+  await expectNavigationUsable(page, { top: 36, bottom: 800 })
+})
+
 test("refresh ignores a stale visual viewport that is taller than the screen", async ({ page }) => {
   const renderedHeight = 764
   const staleVisualViewportHeight = 800
@@ -403,12 +427,22 @@ test("repeated main-boundary overscroll never chains to the document", async ({ 
   await expect(page).toHaveURL(/\/app\/community$/u)
 })
 
-test("install prompt and navigation stay inside both portrait viewports", async ({ page }) => {
+test("install and Push prompts stay inside both portrait viewports", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Notification, "permission", {
+      configurable: true,
+      get: () => "default" satisfies NotificationPermission,
+    })
+  })
   await signIn(page)
 
   for (const viewport of mobileViewports) {
     await page.setViewportSize(viewport)
-    await page.evaluate(() => localStorage.removeItem("huddle.install.dismissed"))
+    await page.evaluate(() => {
+      localStorage.removeItem("huddle.install.dismissed")
+      localStorage.removeItem("huddle.push.rsvpEligibleAt")
+      localStorage.removeItem("huddle.push.dismissedUntil")
+    })
     await page.reload()
     await expect(page.getByRole("link", { name: "Open profile" })).toBeVisible()
     await page.evaluate(() => {
@@ -431,6 +465,31 @@ test("install prompt and navigation stay inside both portrait viewports", async 
     await expectNavigationUsable(page)
     await page.getByRole("button", { name: "Dismiss install prompt" }).click()
     await expect(prompt).toHaveCount(0)
+
+    await page.evaluate(() => {
+      window.dispatchEvent(new Event("huddle:rsvp-success"))
+    })
+    const pushPromptEnvironment = await page.evaluate(() => ({
+      eligibleAt: localStorage.getItem("huddle.push.rsvpEligibleAt"),
+      notificationPermission: Notification.permission,
+      notificationSupported: "Notification" in window,
+      pushManagerSupported: "PushManager" in window,
+      serviceWorkerSupported: "serviceWorker" in navigator,
+    }))
+    expect(pushPromptEnvironment.eligibleAt).not.toBeNull()
+    expect(pushPromptEnvironment.notificationPermission).not.toBe("granted")
+    expect(pushPromptEnvironment.notificationSupported).toBe(true)
+    expect(pushPromptEnvironment.pushManagerSupported).toBe(true)
+    expect(pushPromptEnvironment.serviceWorkerSupported).toBe(true)
+    await expect(page.getByText("Get Huddle alerts", { exact: true })).toBeVisible()
+    const pushPrompt = page.locator("aside")
+    const pushPromptBox = await pushPrompt.boundingBox()
+    expect(pushPromptBox, "Push prompt must have a rendered box").not.toBeNull()
+    expect(pushPromptBox!.y).toBeGreaterThanOrEqual(0)
+    expect(pushPromptBox!.y + pushPromptBox!.height).toBeLessThanOrEqual(viewport.height)
+    await expectNavigationUsable(page)
+    await page.getByRole("button", { name: "Dismiss Push prompt" }).click()
+    await expect(pushPrompt).toHaveCount(0)
   }
 })
 
