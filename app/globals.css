@@ -190,6 +190,21 @@
   font-family: var(--font-heading);
 }
 
+.bottom-nav-safe-area {
+  --bottom-nav-current-inset: env(safe-area-inset-bottom, 0px);
+  --bottom-nav-maximum-inset: env(
+    safe-area-max-inset-bottom,
+    var(--bottom-nav-current-inset)
+  );
+  padding-bottom: max(1rem, var(--bottom-nav-maximum-inset));
+}
+
+.bottom-nav-safe-area-content {
+  transform: translateY(
+    calc(var(--bottom-nav-maximum-inset) - var(--bottom-nav-current-inset))
+  );
+}
+
 .safe-pb {
   padding-bottom: max(1rem, env(safe-area-inset-bottom));
 }
