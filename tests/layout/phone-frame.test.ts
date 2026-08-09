@@ -15,17 +15,20 @@ describe("phone frame viewport sizing", () => {
 
     expect(frameSource).toContain("phone-frame-min-height")
     expect(frameSource).toContain("phone-frame-height")
+    expect(frameSource).toContain("ViewportHeightSync")
     expect(frameSource).not.toMatch(/\b(?:min-)?h-screen\b/)
 
     expect(globalStyles).toContain(
-      ".phone-frame-min-height { min-height: 100vh; }",
-    )
-    expect(globalStyles).toContain(".phone-frame-height { height: 100vh; }")
-    expect(globalStyles).toContain(
-      "@media (min-width: 48rem) { .phone-frame-height { height: calc(100vh - 3rem); } }",
+      ".phone-frame-min-height { min-height: var(--app-viewport-height, 100vh); }",
     )
     expect(globalStyles).toContain(
-      "@supports (height: 100dvh) { .phone-frame-min-height { min-height: 100dvh; } .phone-frame-height { height: 100dvh; } @media (min-width: 48rem) { .phone-frame-height { height: calc(100dvh - 3rem); } } }",
+      ".phone-frame-height { height: var(--app-viewport-height, 100vh); }",
+    )
+    expect(globalStyles).toContain(
+      "@media (min-width: 48rem) { .phone-frame-height { height: calc(var(--app-viewport-height, 100vh) - 3rem); } }",
+    )
+    expect(globalStyles).toContain(
+      "@supports (height: 100dvh) { .phone-frame-min-height { min-height: var(--app-viewport-height, 100dvh); } .phone-frame-height { height: var(--app-viewport-height, 100dvh); } @media (min-width: 48rem) { .phone-frame-height { height: calc(var(--app-viewport-height, 100dvh) - 3rem); } } }",
     )
   })
 })
