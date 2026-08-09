@@ -150,29 +150,30 @@ test("checking state does not create document-level vertical overflow", async ({
   }
 })
 
-test("refresh keeps the frame inside a shorter visual viewport after auth checking", async ({ page }) => {
-  const visibleHeightAfterRefresh = 764
-  await page.addInitScript(({ visibleHeight, storageKey }) => {
+test("refresh ignores a stale visual viewport that is taller than the screen", async ({ page }) => {
+  const renderedHeight = 764
+  const staleVisualViewportHeight = 800
+  await page.setViewportSize({ width: mobileViewport.width, height: renderedHeight })
+  await page.addInitScript(({ staleHeight, storageKey }) => {
     const viewport = window.visualViewport
     if (!viewport) return
 
     const hasLoaded = window.sessionStorage.getItem(storageKey) === "true"
     window.sessionStorage.setItem(storageKey, "true")
-    const reportedHeight = hasLoaded ? visibleHeight : window.innerHeight
 
     Object.defineProperty(viewport, "height", {
       configurable: true,
-      get: () => reportedHeight,
+      get: () => hasLoaded ? staleHeight : window.innerHeight,
     })
   }, {
-    visibleHeight: visibleHeightAfterRefresh,
-    storageKey: "bottom-nav-refresh-viewport-test",
+    staleHeight: staleVisualViewportHeight,
+    storageKey: "bottom-nav-stale-viewport-test",
   })
 
   await signIn(page)
   await expect(page.locator(".phone-frame-height")).toHaveCSS(
     "height",
-    `${mobileViewport.height}px`,
+    `${renderedHeight}px`,
   )
 
   let releaseAuthRequest: (() => void) | undefined
@@ -189,7 +190,7 @@ test("refresh keeps the frame inside a shorter visual viewport after auth checki
     await expect(page.getByText(/Confirming your verified campus profile/u)).toBeVisible()
     await expect(page.locator(".phone-frame-height")).toHaveCSS(
       "height",
-      `${visibleHeightAfterRefresh}px`,
+      `${renderedHeight}px`,
     )
   } finally {
     releaseAuthRequest?.()
@@ -205,18 +206,48 @@ test("refresh keeps the frame inside a shorter visual viewport after auth checki
     }
 
     return {
-      frameHeight: frame.getBoundingClientRect().height,
+      bodyScrollHeight: document.body.scrollHeight,
+      documentClientHeight: document.documentElement.clientHeight,
+      documentScrollHeight: document.documentElement.scrollHeight,
+      frameBottom: frame.getBoundingClientRect().bottom,
+      frameTop: frame.getBoundingClientRect().top,
       navigationBottom: navigation.getBoundingClientRect().bottom,
       visualViewportHeight: window.visualViewport.height,
+      windowScrollY: window.scrollY,
     }
   })
 
-  expect(measurements.visualViewportHeight).toBe(visibleHeightAfterRefresh)
-  expect(measurements.frameHeight).toBe(visibleHeightAfterRefresh)
+  expect(measurements.visualViewportHeight).toBe(staleVisualViewportHeight)
+  expect(measurements.frameTop).toBe(0)
+  expect(measurements.frameBottom).toBe(renderedHeight)
+  expect(measurements.documentClientHeight).toBe(renderedHeight)
+  expect(measurements.documentScrollHeight).toBe(renderedHeight)
+  expect(measurements.bodyScrollHeight).toBe(renderedHeight)
+  expect(measurements.windowScrollY).toBe(0)
   expect(measurements.navigationBottom).toBeLessThanOrEqual(
-    measurements.visualViewportHeight,
+    renderedHeight,
   )
   await expectNavigationUsable(page)
+
+  await page.evaluate(() => window.scrollTo(0, 100))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+
+  await page.goto("/app/community")
+  const main = page.locator("main")
+  await expect(main).toBeVisible()
+  const mainCanScroll = await main.evaluate((element) => {
+    const mainElement = element as HTMLElement
+    return mainElement.scrollHeight > mainElement.clientHeight
+  })
+  expect(mainCanScroll).toBe(true)
+  await main.evaluate((element) => {
+    const mainElement = element as HTMLElement
+    mainElement.scrollTop = 100
+  })
+  await expect.poll(() => main.evaluate((element) => (
+    element as HTMLElement
+  ).scrollTop)).toBeGreaterThan(0)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
 })
 
 test("all application routes keep five bottom navigation links visible and tappable", async ({ page }) => {
