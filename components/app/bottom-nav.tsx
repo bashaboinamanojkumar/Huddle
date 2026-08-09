@@ -42,7 +42,7 @@ export function BottomNav() {
               href={tab.href}
               className={cn(
                 "flex min-w-14 flex-col items-center justify-center gap-1 rounded-2xl px-2 py-1 text-[10px] transition-colors",
-                active ? "text-secondary" : "text-white/54 hover:text-white"
+                active ? "bg-secondary/15 text-secondary" : "text-white/54 hover:text-white"
               )}
             >
               <span className="relative">
