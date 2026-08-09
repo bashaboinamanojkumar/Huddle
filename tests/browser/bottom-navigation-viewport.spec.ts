@@ -6,6 +6,10 @@ import {
 } from "./fixture"
 
 const mobileViewport = { width: 360, height: 800 }
+const mobileViewports = [
+  mobileViewport,
+  { width: 390, height: 844 },
+] as const
 const navigationLabels = ["Feed", "Community", "Host", "Chats", "Profile"] as const
 const shellRoutes = [
   "/app",
@@ -14,7 +18,13 @@ const shellRoutes = [
   "/app/chats",
   "/app/profile",
   `/app/activity/${DETAIL_ACTIVITY_ID}`,
+  "/app/notifications",
 ] as const
+
+type VisibleRect = {
+  top: number
+  bottom: number
+}
 
 type LinkRect = {
   label: string
@@ -22,6 +32,29 @@ type LinkRect = {
   y: number
   width: number
   height: number
+}
+
+async function installVisualViewportMismatch(
+  page: Page,
+  mismatch: { height: number; offsetTop: number },
+  storageKey: string,
+): Promise<void> {
+  await page.addInitScript(({ stale, key }) => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+
+    const mismatchActive = () => window.sessionStorage.getItem(key) === "true"
+    Object.defineProperties(viewport, {
+      height: {
+        configurable: true,
+        get: () => mismatchActive() ? stale.height : window.innerHeight,
+      },
+      offsetTop: {
+        configurable: true,
+        get: () => mismatchActive() ? stale.offsetTop : 0,
+      },
+    })
+  }, { stale: mismatch, key: storageKey })
 }
 
 async function signIn(page: Page): Promise<void> {
@@ -82,10 +115,15 @@ async function navigationRects(page: Page): Promise<LinkRect[]> {
   )
 }
 
-async function expectNavigationUsable(page: Page): Promise<void> {
+async function expectNavigationUsable(
+  page: Page,
+  visibleRect?: VisibleRect,
+): Promise<void> {
   const navigation = page.getByRole("navigation")
   await expect(navigation.getByRole("link")).toHaveCount(5)
   const viewportHeight = await page.evaluate(() => window.innerHeight)
+  const top = visibleRect?.top ?? 0
+  const bottom = visibleRect?.bottom ?? viewportHeight
 
   for (const label of navigationLabels) {
     const link = navigation.getByRole("link").filter({ hasText: label })
@@ -93,11 +131,11 @@ async function expectNavigationUsable(page: Page): Promise<void> {
     await expect(link).toBeVisible()
     const box = await link.boundingBox()
     expect(box, `${label} must have a rendered box`).not.toBeNull()
-    expect(box!.y, `${label} must start inside the viewport`).toBeGreaterThanOrEqual(0)
+    expect(box!.y, `${label} must start inside the viewport`).toBeGreaterThanOrEqual(top)
     expect(
       box!.y + box!.height,
       `${label} must end inside the viewport`,
-    ).toBeLessThanOrEqual(viewportHeight)
+    ).toBeLessThanOrEqual(bottom)
 
     const centerHitsLink = await page.evaluate(({ x, y, expectedLabel }) => {
       const hit = document.elementFromPoint(x, y)?.closest("a")
@@ -150,25 +188,85 @@ test("checking state does not create document-level vertical overflow", async ({
   }
 })
 
+test("reload aligns confirmation and authenticated shells to the visible viewport", async ({ page }) => {
+  const storageKey = "bottom-nav-short-visual-viewport"
+  await page.setViewportSize(mobileViewport)
+  await installVisualViewportMismatch(
+    page,
+    { height: 764, offsetTop: 36 },
+    storageKey,
+  )
+  await signIn(page)
+  await expect(page.locator(".phone-frame-height")).toHaveCSS("height", "800px")
+  await expect(page.locator(".phone-frame-height")).toHaveCSS("top", "0px")
+
+  let releaseAuthRequest: (() => void) | undefined
+  const authGate = new Promise<void>((resolve) => {
+    releaseAuthRequest = resolve
+  })
+  await page.route("**/auth/v1/user", async (route) => {
+    await authGate
+    await route.continue()
+  })
+  await page.evaluate((key) => sessionStorage.setItem(key, "true"), storageKey)
+
+  try {
+    await page.reload()
+    const notice = page.getByText(/Confirming your verified campus profile/u)
+    await expect(notice).toBeVisible()
+    await expect(page.locator(".phone-frame-height")).toHaveCSS("height", "764px")
+    await expect(page.locator(".phone-frame-height")).toHaveCSS("top", "36px")
+    const noticeBox = await notice.boundingBox()
+    expect(noticeBox, "confirmation must have a rendered box").not.toBeNull()
+    expect(noticeBox!.y).toBeGreaterThanOrEqual(36)
+    expect(noticeBox!.y + noticeBox!.height).toBeLessThanOrEqual(800)
+    expect(await page.evaluate(() => window.scrollY)).toBe(0)
+  } finally {
+    releaseAuthRequest?.()
+    await page.unroute("**/auth/v1/user")
+  }
+
+  await expect(page.getByRole("link", { name: "Open profile" })).toBeVisible()
+  const frameBounds = await page.locator(".phone-frame-height").evaluate((element) => {
+    const rect = element.getBoundingClientRect()
+    return { top: rect.top, bottom: rect.bottom }
+  })
+  expect(frameBounds).toEqual({ top: 36, bottom: 800 })
+
+  const header = page.locator("header").first()
+  await expect(header).toBeVisible()
+  const headerBox = await header.boundingBox()
+  expect(headerBox, "header must have a rendered box").not.toBeNull()
+  expect(headerBox!.y).toBeGreaterThanOrEqual(36)
+  expect(headerBox!.y + headerBox!.height).toBeLessThanOrEqual(800)
+  await expectNavigationUsable(page, { top: 36, bottom: 800 })
+
+  await page.evaluate(() => window.scrollTo(0, 100))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+
+  await page.goto("/app/community")
+  const main = page.locator("main")
+  await expect(main).toBeVisible()
+  expect(await main.evaluate((element) => (
+    element.scrollHeight > element.clientHeight
+  ))).toBe(true)
+  await main.evaluate((element) => {
+    element.scrollTop = 100
+  })
+  await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+})
+
 test("refresh ignores a stale visual viewport that is taller than the screen", async ({ page }) => {
   const renderedHeight = 764
   const staleVisualViewportHeight = 800
+  const storageKey = "bottom-nav-tall-visual-viewport"
   await page.setViewportSize({ width: mobileViewport.width, height: renderedHeight })
-  await page.addInitScript(({ staleHeight, storageKey }) => {
-    const viewport = window.visualViewport
-    if (!viewport) return
-
-    const hasLoaded = window.sessionStorage.getItem(storageKey) === "true"
-    window.sessionStorage.setItem(storageKey, "true")
-
-    Object.defineProperty(viewport, "height", {
-      configurable: true,
-      get: () => hasLoaded ? staleHeight : window.innerHeight,
-    })
-  }, {
-    staleHeight: staleVisualViewportHeight,
-    storageKey: "bottom-nav-stale-viewport-test",
-  })
+  await installVisualViewportMismatch(
+    page,
+    { height: staleVisualViewportHeight, offsetTop: 0 },
+    storageKey,
+  )
 
   await signIn(page)
   await expect(page.locator(".phone-frame-height")).toHaveCSS(
@@ -184,6 +282,7 @@ test("refresh ignores a stale visual viewport that is taller than the screen", a
     await authGate
     await route.continue()
   })
+  await page.evaluate((key) => sessionStorage.setItem(key, "true"), storageKey)
 
   try {
     await page.reload()
@@ -253,11 +352,85 @@ test("refresh ignores a stale visual viewport that is taller than the screen", a
 test("all application routes keep five bottom navigation links visible and tappable", async ({ page }) => {
   await signIn(page)
 
-  for (const route of shellRoutes) {
-    await page.goto(route)
-    await setBottomSafeArea(page, 36, 36)
-    await expectNoDocumentOverflow(page, mobileViewport.height)
+  for (const viewport of mobileViewports) {
+    await page.setViewportSize(viewport)
+    for (const route of shellRoutes) {
+      await page.goto(route)
+      await setBottomSafeArea(page, 36, 36)
+      await expectNoDocumentOverflow(page, viewport.height)
+      await expectNavigationUsable(page)
+    }
+  }
+})
+
+test("repeated main-boundary overscroll never chains to the document", async ({ page }) => {
+  await signIn(page)
+  await page.goto("/app/community")
+  const main = page.locator("main")
+  await expect(main).toBeVisible()
+
+  await expect.poll(() => page.evaluate(() => ({
+    bodyOverflowY: getComputedStyle(document.body).overflowY,
+    bodyOverscrollY: getComputedStyle(document.body).overscrollBehaviorY,
+    documentOverflowY: getComputedStyle(document.documentElement).overflowY,
+    documentOverscrollY: getComputedStyle(document.documentElement).overscrollBehaviorY,
+    mainOverscrollY: getComputedStyle(document.querySelector("main")!).overscrollBehaviorY,
+  }))).toEqual({
+    bodyOverflowY: "hidden",
+    bodyOverscrollY: "none",
+    documentOverflowY: "hidden",
+    documentOverscrollY: "none",
+    mainOverscrollY: "contain",
+  })
+
+  await main.evaluate((element) => { element.scrollTop = 0 })
+  await main.hover()
+  for (let index = 0; index < 3; index += 1) {
+    await page.mouse.wheel(0, -1200)
+  }
+  await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBe(0)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+
+  await main.evaluate((element) => { element.scrollTop = element.scrollHeight })
+  const maximumScroll = await main.evaluate(
+    (element) => element.scrollHeight - element.clientHeight,
+  )
+  for (let index = 0; index < 3; index += 1) {
+    await page.mouse.wheel(0, 1200)
+  }
+  await expect.poll(() => main.evaluate((element) => element.scrollTop)).toBe(maximumScroll)
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0)
+  await expect(page).toHaveURL(/\/app\/community$/u)
+})
+
+test("install prompt and navigation stay inside both portrait viewports", async ({ page }) => {
+  await signIn(page)
+
+  for (const viewport of mobileViewports) {
+    await page.setViewportSize(viewport)
+    await page.evaluate(() => localStorage.removeItem("huddle.install.dismissed"))
+    await page.reload()
+    await expect(page.getByRole("link", { name: "Open profile" })).toBeVisible()
+    await page.evaluate(() => {
+      const event = new Event("beforeinstallprompt")
+      Object.defineProperties(event, {
+        prompt: { value: async () => undefined },
+        userChoice: {
+          value: Promise.resolve({ outcome: "dismissed", platform: "web" }),
+        },
+      })
+      window.dispatchEvent(event)
+    })
+
+    await expect(page.getByText("Install Huddle", { exact: true })).toBeVisible()
+    const prompt = page.locator("aside")
+    const promptBox = await prompt.boundingBox()
+    expect(promptBox, "install prompt must have a rendered box").not.toBeNull()
+    expect(promptBox!.y).toBeGreaterThanOrEqual(0)
+    expect(promptBox!.y + promptBox!.height).toBeLessThanOrEqual(viewport.height)
     await expectNavigationUsable(page)
+    await page.getByRole("button", { name: "Dismiss install prompt" }).click()
+    await expect(prompt).toHaveCount(0)
   }
 })
 
