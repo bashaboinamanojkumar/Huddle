@@ -171,6 +171,12 @@
   }
 }
 
+html.app-viewport-locked,
+body.app-viewport-locked {
+  overflow-y: hidden;
+  overscroll-behavior-y: none;
+}
+
 @media (max-width: 47.999rem) {
   html:has(.phone-frame-viewport),
   body:has(.phone-frame-viewport) {
@@ -183,8 +189,17 @@
 
   .phone-frame-height {
     position: fixed;
-    inset: 0;
-    height: auto;
+    top: var(--app-viewport-top, 0px);
+    right: 0;
+    bottom: auto;
+    left: 0;
+    height: var(--app-viewport-height, 100vh);
+  }
+
+  @supports (height: 100dvh) {
+    .phone-frame-height {
+      height: var(--app-viewport-height, 100dvh);
+    }
   }
 }
 
@@ -228,6 +243,10 @@
 
 .safe-pt {
   padding-top: max(1rem, env(safe-area-inset-top));
+}
+
+.authenticated-main {
+  overscroll-behavior-y: contain;
 }
 
 .authenticated-main:not(:has(.safe-pt)):not(:has(.ios-safe-pt)) {
