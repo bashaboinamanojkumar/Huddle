@@ -150,6 +150,75 @@ test("checking state does not create document-level vertical overflow", async ({
   }
 })
 
+test("refresh keeps the frame inside a shorter visual viewport after auth checking", async ({ page }) => {
+  const visibleHeightAfterRefresh = 764
+  await page.addInitScript(({ visibleHeight, storageKey }) => {
+    const viewport = window.visualViewport
+    if (!viewport) return
+
+    const hasLoaded = window.sessionStorage.getItem(storageKey) === "true"
+    window.sessionStorage.setItem(storageKey, "true")
+    const reportedHeight = hasLoaded ? visibleHeight : window.innerHeight
+
+    Object.defineProperty(viewport, "height", {
+      configurable: true,
+      get: () => reportedHeight,
+    })
+  }, {
+    visibleHeight: visibleHeightAfterRefresh,
+    storageKey: "bottom-nav-refresh-viewport-test",
+  })
+
+  await signIn(page)
+  await expect(page.locator(".phone-frame-height")).toHaveCSS(
+    "height",
+    `${mobileViewport.height}px`,
+  )
+
+  let releaseAuthRequest: (() => void) | undefined
+  const authGate = new Promise<void>((resolve) => {
+    releaseAuthRequest = resolve
+  })
+  await page.route("**/auth/v1/user", async (route) => {
+    await authGate
+    await route.continue()
+  })
+
+  try {
+    await page.reload()
+    await expect(page.getByText(/Confirming your verified campus profile/u)).toBeVisible()
+    await expect(page.locator(".phone-frame-height")).toHaveCSS(
+      "height",
+      `${visibleHeightAfterRefresh}px`,
+    )
+  } finally {
+    releaseAuthRequest?.()
+    await page.unroute("**/auth/v1/user")
+  }
+
+  await expect(page.getByRole("link", { name: "Open profile" })).toBeVisible()
+  const measurements = await page.evaluate(() => {
+    const frame = document.querySelector<HTMLElement>(".phone-frame-height")
+    const navigation = document.querySelector<HTMLElement>("nav")
+    if (!frame || !navigation || !window.visualViewport) {
+      throw new Error("Viewport test elements are unavailable")
+    }
+
+    return {
+      frameHeight: frame.getBoundingClientRect().height,
+      navigationBottom: navigation.getBoundingClientRect().bottom,
+      visualViewportHeight: window.visualViewport.height,
+    }
+  })
+
+  expect(measurements.visualViewportHeight).toBe(visibleHeightAfterRefresh)
+  expect(measurements.frameHeight).toBe(visibleHeightAfterRefresh)
+  expect(measurements.navigationBottom).toBeLessThanOrEqual(
+    measurements.visualViewportHeight,
+  )
+  await expectNavigationUsable(page)
+})
+
 test("all application routes keep five bottom navigation links visible and tappable", async ({ page }) => {
   await signIn(page)
 
