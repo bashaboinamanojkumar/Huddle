@@ -141,6 +141,36 @@
   }
 }
 
+.phone-frame-min-height {
+  min-height: 100vh;
+}
+
+.phone-frame-height {
+  height: 100vh;
+}
+
+@media (min-width: 48rem) {
+  .phone-frame-height {
+    height: calc(100vh - 3rem);
+  }
+}
+
+@supports (height: 100dvh) {
+  .phone-frame-min-height {
+    min-height: 100dvh;
+  }
+
+  .phone-frame-height {
+    height: 100dvh;
+  }
+
+  @media (min-width: 48rem) {
+    .phone-frame-height {
+      height: calc(100dvh - 3rem);
+    }
+  }
+}
+
 @keyframes float {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-12px); }
