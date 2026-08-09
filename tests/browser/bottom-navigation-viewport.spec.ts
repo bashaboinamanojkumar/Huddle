@@ -58,12 +58,12 @@ async function expectNoDocumentOverflow(page: Page, height: number): Promise<voi
     innerHeight: window.innerHeight,
     documentClientHeight: document.documentElement.clientHeight,
     documentScrollHeight: document.documentElement.scrollHeight,
-    bodyScrollHeight: document.body.scrollHeight,
+    bodyWithinViewport: document.body.scrollHeight <= window.innerHeight,
   }))).toEqual({
     innerHeight: height,
     documentClientHeight: height,
     documentScrollHeight: height,
-    bodyScrollHeight: height,
+    bodyWithinViewport: true,
   })
 }
 
@@ -222,7 +222,7 @@ test("refresh ignores a stale visual viewport that is taller than the screen", a
   expect(measurements.frameBottom).toBe(renderedHeight)
   expect(measurements.documentClientHeight).toBe(renderedHeight)
   expect(measurements.documentScrollHeight).toBe(renderedHeight)
-  expect(measurements.bodyScrollHeight).toBe(renderedHeight)
+  expect(measurements.bodyScrollHeight).toBeLessThanOrEqual(renderedHeight)
   expect(measurements.windowScrollY).toBe(0)
   expect(measurements.navigationBottom).toBeLessThanOrEqual(
     renderedHeight,

@@ -1,9 +1,9 @@
-import { readFileSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 import { describe, expect, it } from "vitest"
 
 describe("phone frame viewport sizing", () => {
-  it("uses the visual viewport with CSS fallbacks and desktop spacing", () => {
+  it("anchors the mobile shell while preserving CSS fallbacks and desktop spacing", () => {
     const frameSource = readFileSync(
       resolve(process.cwd(), "components/layout/phone-frame.tsx"),
       "utf8",
@@ -15,20 +15,28 @@ describe("phone frame viewport sizing", () => {
 
     expect(frameSource).toContain("phone-frame-min-height")
     expect(frameSource).toContain("phone-frame-height")
-    expect(frameSource).toContain("ViewportHeightSync")
+    expect(frameSource).toContain("phone-frame-viewport")
+    expect(frameSource).not.toContain("ViewportHeightSync")
+    expect(existsSync(resolve(
+      process.cwd(),
+      "components/layout/viewport-height-sync.tsx",
+    ))).toBe(false)
     expect(frameSource).not.toMatch(/\b(?:min-)?h-screen\b/)
 
     expect(globalStyles).toContain(
-      ".phone-frame-min-height { min-height: var(--app-viewport-height, 100vh); }",
+      ".phone-frame-min-height { min-height: 100vh; }",
     )
     expect(globalStyles).toContain(
-      ".phone-frame-height { height: var(--app-viewport-height, 100vh); }",
+      ".phone-frame-height { height: 100vh; }",
     )
     expect(globalStyles).toContain(
-      "@media (min-width: 48rem) { .phone-frame-height { height: calc(var(--app-viewport-height, 100vh) - 3rem); } }",
+      "@media (min-width: 48rem) { .phone-frame-height { height: calc(100vh - 3rem); } }",
     )
     expect(globalStyles).toContain(
-      "@supports (height: 100dvh) { .phone-frame-min-height { min-height: var(--app-viewport-height, 100dvh); } .phone-frame-height { height: var(--app-viewport-height, 100dvh); } @media (min-width: 48rem) { .phone-frame-height { height: calc(var(--app-viewport-height, 100dvh) - 3rem); } } }",
+      "@supports (height: 100dvh) { .phone-frame-min-height { min-height: 100dvh; } .phone-frame-height { height: 100dvh; } @media (min-width: 48rem) { .phone-frame-height { height: calc(100dvh - 3rem); } } }",
+    )
+    expect(globalStyles).toContain(
+      "@media (max-width: 47.999rem) { html:has(.phone-frame-viewport), body:has(.phone-frame-viewport) { overflow-y: hidden; } .phone-frame-min-height { min-height: 0; } .phone-frame-height { position: fixed; inset: 0; height: auto; } }",
     )
   })
 
