@@ -12,7 +12,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <PhoneFrame>
       <SessionGuard>
         <NotificationProvider>
-          <main className="authenticated-main min-h-0 flex-1 overflow-y-auto pb-20">
+          <main className="authenticated-main min-h-0 flex-1 overflow-y-auto pb-24">
             {children}
           </main>
           <div className="shrink-0">
