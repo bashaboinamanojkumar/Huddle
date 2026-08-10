@@ -19,7 +19,7 @@ export function BottomNav() {
   const { unreadChatCount } = useNotifications()
 
   return (
-    <nav className="sticky bottom-0 z-40 border-t border-white/10 bg-black/75 px-3 pt-2 backdrop-blur-xl">
+    <nav className="sticky bottom-0 z-40 border-t border-white/10 bg-black/75 px-3 pt-2 backdrop-blur-xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
       <div className="mx-auto flex max-w-md items-end justify-between">
         {tabs.map((tab) => {
           const active = tab.href === "/app" ? pathname === "/app" : pathname.startsWith(tab.href)
