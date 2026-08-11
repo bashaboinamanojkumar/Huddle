@@ -137,7 +137,7 @@ export default function StudentProfilePage() {
             <p className="text-[11px] text-white/62">meetups</p>
           </div>
         </div>
-
+        console.log('DEBUG', { isMe, isAccepted, isPending, isIncoming, isOutgoing, friendConnection, currentUserId, profileId: params.id })
         {!isMe && (
           <div className="mt-5">
             {isAccepted && (
