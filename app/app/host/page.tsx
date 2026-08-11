@@ -34,7 +34,10 @@ export default function HostPage() {
   const [comfortSize, setComfortSize] = useState<ComfortSize>("medium")
   const [safetyPreference, setSafetyPreference] = useState<SafetyPreference>("none")
   const [customLocation, setCustomLocation] = useState("")
-const [useCustomLocation, setUseCustomLocation] = useState(false)
+  const [useCustomLocation, setUseCustomLocation] = useState(false)
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurrenceType, setRecurrenceType] = useState<"daily" | "weekly" | "biweekly">("weekly")
+  const [recurrenceCount, setRecurrenceCount] = useState(4)
   const canSubmit =
     title.trim().length >= 3 &&
     title.trim().length <= 80 &&
@@ -56,19 +59,35 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
 
     setSubmitting(true)
     try {
-      const activity = await createActivity({
-        title: title.trim(),
-        description: useCustomLocation && customLocation.trim()
+      const baseDescription = useCustomLocation && customLocation.trim()
         ? `${description.trim()}\n\nSuggested meet point: ${customLocation.trim()}`
-        : description.trim(),
-        category,
-        locationId,
-        capacity,
-        startTime: new Date(startTime).toISOString(),
-        availabilityBlock,
-        comfortSize,
-        safetyPreference,
-      })
+        : description.trim()
+
+      const getDaysToAdd = () => {
+        if (recurrenceType === "daily") return 1
+        if (recurrenceType === "weekly") return 7
+        return 14
+      }
+
+      const occurrences = isRecurring ? recurrenceCount : 1
+
+      for (let i = 0; i < occurrences; i++) {
+        const date = new Date(startTime)
+        date.setDate(date.getDate() + i * getDaysToAdd())
+        await createActivity({
+          title: title.trim(),
+          description: isRecurring
+            ? `${baseDescription}\n\n📅 Occurrence ${i + 1} of ${occurrences}`
+            : baseDescription,
+          category,
+          locationId,
+          capacity,
+          startTime: date.toISOString(),
+          availabilityBlock,
+          comfortSize,
+          safetyPreference,
+        })
+      }
       setSubmitted(true)
     } catch {
       toast.error("Could not send your activity to review. Please try again.")
@@ -304,6 +323,61 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
               </button>
             ))}
           </div>
+        </section>
+                <section className="glass-card rounded-[2rem] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-lg font-bold text-white">Recurring event</h2>
+            <button
+              type="button"
+              onClick={() => setIsRecurring(!isRecurring)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${isRecurring ? "bg-secondary" : "bg-white/20"}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isRecurring ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-white/46">Create multiple events on a repeating schedule</p>
+
+          {isRecurring && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-white/46 mb-2">Repeat</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["daily", "weekly", "biweekly"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setRecurrenceType(type)}
+                      className={`rounded-2xl px-3 py-3 text-xs font-bold capitalize ${
+                        recurrenceType === type ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/60"
+                      }`}
+                    >
+                      {type === "biweekly" ? "Bi-weekly" : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-white/46 mb-2">
+                  Number of occurrences: {recurrenceCount}
+                </h3>
+                <input
+                  type="range"
+                  min={2}
+                  max={12}
+                  value={recurrenceCount}
+                  onChange={(e) => setRecurrenceCount(Number(e.target.value))}
+                  className="w-full accent-secondary"
+                />
+                <div className="flex justify-between text-xs text-white/40 mt-1">
+                  <span>2</span>
+                  <span>12</span>
+                </div>
+              </div>
+              <p className="text-xs text-white/46">
+                This will create {recurrenceCount} separate events starting from your selected date.
+              </p>
+            </div>
+          )}
         </section>
 
         <div className="rounded-3xl border border-coral/20 bg-coral/10 p-4">
