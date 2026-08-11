@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useMemo, useState, useEffect } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Award, CalendarHeart, GraduationCap, UserCheck, UserPlus } from "lucide-react"
@@ -86,7 +86,9 @@ export default function StudentProfilePage() {
   }
 
   const isMe = profile.userId === currentUserId
-
+  useEffect(() => {
+  console.log('DEBUG', { isMe, isAccepted, isPending, isIncoming, isOutgoing, friendConnection, currentUserId, profileId: params.id })
+}, [isMe, isAccepted, friendConnection])
   return (
     <div className="min-h-full bg-background">
       <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-7">
@@ -137,7 +139,7 @@ export default function StudentProfilePage() {
             <p className="text-[11px] text-white/62">meetups</p>
           </div>
         </div>
-        console.log('DEBUG', { isMe, isAccepted, isPending, isIncoming, isOutgoing, friendConnection, currentUserId, profileId: params.id })
+
         {!isMe && (
           <div className="mt-5">
             {isAccepted && (
