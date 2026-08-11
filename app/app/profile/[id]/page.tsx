@@ -73,15 +73,11 @@ export default function StudentProfilePage() {
     [profile]
   )
 
-  
-
   if (!profile) {
     return (
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
           <h1 className="font-heading text-xl font-bold text-white">Profile not found</h1>
-          <p className="text-xs text-white/50 mt-2">Looking for: {params.id}</p>
-          <p className="text-xs text-white/50 mt-1">Have: {debugProfiles.join(', ')}</p>
           <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Back to feed
           </Link>
@@ -91,9 +87,7 @@ export default function StudentProfilePage() {
   }
 
   const isMe = profile.userId === currentUserId
-  useEffect(() => {
-  console.log('DEBUG', { isMe, isAccepted, isPending, isIncoming, isOutgoing, friendConnection, currentUserId, profileId: params.id })
-}, [isMe, isAccepted, friendConnection])
+  
   return (
     <div className="min-h-full bg-background">
       <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-7">
