@@ -257,11 +257,12 @@ export async function reviewActivity(
 export async function addFriend(
   supabase: HuddleBrowserClient,
   userId: string,
-  friendId: string
+  friendId: string,
+  message?: string
 ): Promise<FriendConnection | null> {
   const { data, error } = await supabase
     .from("friend_connections")
-    .insert({ user_id: userId, friend_id: friendId })
+    .insert({ user_id: userId, friend_id: friendId, message: message ?? null } as any)
     .select("*")
     .maybeSingle()
 
@@ -313,4 +314,27 @@ export async function submitPulseResponse(
   if (!data) throw new Error("Could not save your private response")
 
   return toPulseResponseView(data)
+}
+
+export async function sendDirectMessage(
+  supabase: HuddleBrowserClient,
+  receiverId: string,
+  body: string
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { error } = await supabase
+  .from('direct_messages' as any)
+  .insert({ sender_id: user.id, receiver_id: receiverId, body })
+
+  throwOnError(error, 'Could not send message')
+}
+
+export async function unfriend(
+  supabase: HuddleBrowserClient,
+  friendId: string
+): Promise<void> {
+  const { error } = await supabase.rpc('unfriend' as any, { p_friend_id: friendId })
+  throwOnError(error, 'Could not unfriend')
 }

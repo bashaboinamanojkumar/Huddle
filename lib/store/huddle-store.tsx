@@ -136,7 +136,9 @@ interface HuddleContextValue {
     activityId: string,
     status: "approved" | "rejected"
   ) => Promise<void>
-  addFriend: (friendId: string) => Promise<void>
+  addFriend: (friendId: string, message?: string) => Promise<void>
+  unfriend: (friendId: string) => Promise<void>
+  sendDirectMessage: (receiverId: string, body: string) => Promise<void>
   acceptFriend: (connectionId: string) => Promise<void>
   declineFriend: (connectionId: string) => Promise<void>
 }
@@ -474,15 +476,31 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   )
 
   const addFriend = useCallback(
-    async (friendId: string) => {
+    async (friendId: string, message?: string) => {
       const supabase = createClient()
-      const connection = await mutations.addFriend(supabase, requireUser(), friendId)
-
+      const connection = await mutations.addFriend(supabase, requireUser(), friendId, message)
       if (connection) {
         setState((prev) => ({ ...prev, friends: [...prev.friends, connection] }))
       }
     },
     [requireUser]
+  )
+
+  const unfriend = useCallback(
+    async (friendId: string) => {
+      const supabase = createClient()
+      await mutations.unfriend(supabase, friendId)
+      await refresh()
+    },
+    [refresh]
+  )
+
+  const sendDirectMessage = useCallback(
+    async (receiverId: string, body: string) => {
+      const supabase = createClient()
+      await mutations.sendDirectMessage(supabase, receiverId, body)
+    },
+    []
   )
 
   const acceptFriend = useCallback(
@@ -531,6 +549,8 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       addFriend,
       acceptFriend,
       declineFriend,
+      unfriend,
+      sendDirectMessage,
     }),
     [
       state,
@@ -557,6 +577,8 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       addFriend,
       acceptFriend,
       declineFriend,
+      unfriend,
+      sendDirectMessage,
     ]
   )
 
