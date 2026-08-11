@@ -36,6 +36,7 @@ export default function StudentProfilePage() {
   const { state, currentUserId, approvedActivities, addFriend, acceptFriend, declineFriend, unfriend, sendDirectMessage } = useHuddle()
 
   const profile = state.profiles.find((p) => p.userId === params.id)
+  const debugProfiles = state.profiles.map(p => p.userId).slice(0, 3)
 
   const friendConnection = useMemo(
     () => state.friends.find(
@@ -77,6 +78,21 @@ export default function StudentProfilePage() {
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
           <h1 className="font-heading text-xl font-bold text-white">Profile not found</h1>
+          <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
+            Back to feed
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  if (!profile) {
+    return (
+      <div className="flex min-h-full items-center justify-center px-5 text-center">
+        <div className="glass-card rounded-[2rem] p-6">
+          <h1 className="font-heading text-xl font-bold text-white">Profile not found</h1>
+          <p className="text-xs text-white/50 mt-2">Looking for: {params.id}</p>
+          <p className="text-xs text-white/50 mt-1">Have: {debugProfiles.join(', ')}</p>
           <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Back to feed
           </Link>
