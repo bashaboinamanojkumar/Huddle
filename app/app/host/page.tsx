@@ -13,6 +13,7 @@ import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference } from 
 
 export default function HostPage() {
   const { state, createActivity } = useHuddle()
+  const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
   const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [category, setCategory] = useState<Category>("coffee")
@@ -180,7 +181,7 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
         <section className="glass-card rounded-[2rem] p-5">
           <h2 className="font-heading text-lg font-bold text-white">Public location</h2>
           <div className="mt-4 grid gap-3">
-            {state.locations.map((location) => (
+            {state.locations.filter((location) => location.universityId === userUniversityId).map((location) => (
               <button
                 key={location.id}
                 type="button"

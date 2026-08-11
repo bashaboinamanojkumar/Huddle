@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Award, CalendarHeart, GraduationCap, UserCheck, UserPlus } from "lucide-react"
