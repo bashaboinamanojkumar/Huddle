@@ -73,18 +73,7 @@ export default function StudentProfilePage() {
     [profile]
   )
 
-  if (!profile) {
-    return (
-      <div className="flex min-h-full items-center justify-center px-5 text-center">
-        <div className="glass-card rounded-[2rem] p-6">
-          <h1 className="font-heading text-xl font-bold text-white">Profile not found</h1>
-          <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
-            Back to feed
-          </Link>
-        </div>
-      </div>
-    )
-  }
+  
 
   if (!profile) {
     return (
