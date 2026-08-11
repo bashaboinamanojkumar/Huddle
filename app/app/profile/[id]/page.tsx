@@ -36,7 +36,7 @@ export default function StudentProfilePage() {
   const { state, currentUserId, approvedActivities, addFriend, acceptFriend, declineFriend, unfriend, sendDirectMessage } = useHuddle()
 
   const profile = state.profiles.find((p) => p.userId === params.id)
-  const debugProfiles = state.profiles.map(p => p.userId).slice(0, 3)
+  
 
   const friendConnection = useMemo(
     () => state.friends.find(
