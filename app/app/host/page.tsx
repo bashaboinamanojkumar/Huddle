@@ -13,7 +13,7 @@ import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference } from 
 
 export default function HostPage() {
   const { state, createActivity } = useHuddle()
-  const [createdId, setCreatedId] = useState<string | null>(null)
+  const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [category, setCategory] = useState<Category>("coffee")
   const [title, setTitle] = useState("")
@@ -68,8 +68,7 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
         comfortSize,
         safetyPreference,
       })
-      setCreatedId(activity.id)
-      toast.success("Draft sent to review. It is hidden until approved.")
+      setSubmitted(true)
     } catch {
       toast.error("Could not send your activity to review. Please try again.")
     } finally {
@@ -101,24 +100,40 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
         </div>
       )}
 
-      {createdId && (
-        <div className="mt-5 rounded-3xl border border-mint/20 bg-mint/10 p-4">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-mint" />
-            <div>
-              <p className="text-sm font-bold text-white">Pending review</p>
-              <p className="mt-1 text-xs leading-5 text-white/58">
-                This activity is hidden from other students until the review queue approves it.
-              </p>
-              <Link href="/app/admin/review" className="mt-3 inline-flex rounded-2xl bg-white px-4 py-2 text-xs font-bold text-black">
-                View review queue
+      
+      {submitted && (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center text-center px-4">
+            <img src="/ollie.png" alt="Ollie" className="h-32 w-32 object-contain mx-auto" style={{ mixBlendMode: "screen" }} />
+            <h2 className="mt-6 font-heading text-2xl font-black text-white">Thanks for your submission!</h2>
+            <p className="mt-3 text-sm leading-6 text-white/62">
+              Your event will be reviewed by the Huddle team before it goes live. We'll make sure it's a good fit for the community.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 w-full max-w-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitted(false)
+                  setTitle("")
+                  setDescription("")
+                  setStartTime("")
+                  setCapacity(4)
+                  setCustomLocation("")
+                  setUseCustomLocation(false)
+                }}
+                className="rounded-2xl bg-secondary px-5 py-4 text-sm font-black text-secondary-foreground"
+              >
+                Create another event
+              </button>
+              <Link
+                href="/app"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-sm font-bold text-white"
+              >
+                Back to home
               </Link>
             </div>
           </div>
-        </div>
       )}
-
-      <form onSubmit={submit} className="mt-5 space-y-5">
+      <form onSubmit={submit} className={`mt-5 space-y-5 ${submitted ? "hidden" : ""}`}>
         <section className="glass-card rounded-[2rem] p-5">
           <h2 className="font-heading text-lg font-bold text-white">Category</h2>
           <div className="mt-4 grid grid-cols-2 gap-3">
