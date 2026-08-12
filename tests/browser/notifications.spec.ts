@@ -37,7 +37,11 @@ test("Feed and Community expose only their approved header actions", async ({ pa
   await expect(page.getByRole("heading", { name: "Hey, Browser 👋" })).toBeVisible()
 
   await feedHeader.getByRole("button", { name: "Invite friends" }).click()
-  await expect(page.getByText("Invite link copied for the pilot demo.")).toBeVisible()
+  const inviteToast = page.getByText("Invite link copied for the pilot demo.")
+  await expect(inviteToast).toBeVisible()
+  const viewport = page.viewportSize()
+  await page.mouse.move(4, Math.max(4, (viewport?.height ?? 844) - 4))
+  await expect(inviteToast).toBeHidden({ timeout: 10_000 })
 
   for (const width of [320, 390]) {
     await page.setViewportSize({ width, height: width === 320 ? 568 : 844 })

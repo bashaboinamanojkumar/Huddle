@@ -249,6 +249,120 @@ body.app-viewport-locked {
   overscroll-behavior-y: contain;
 }
 
+.authenticated-main[data-refresh-phase] {
+  --pull-distance: 0px;
+}
+
+.pull-to-refresh-content {
+  min-height: 100%;
+  transform: translate3d(0, var(--pull-distance), 0);
+  will-change: transform;
+}
+
+.pull-to-refresh-indicator {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  left: 50%;
+  z-index: 20;
+  display: flex;
+  height: 2rem;
+  width: 2rem;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: #0f1318;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate3d(-50%, calc(var(--pull-distance) - 3rem), 0);
+  will-change: transform, opacity;
+}
+
+.authenticated-main[data-refresh-phase="pulling"] .pull-to-refresh-indicator,
+.authenticated-main[data-refresh-phase="armed"] .pull-to-refresh-indicator,
+.authenticated-main[data-refresh-phase="refreshing"] .pull-to-refresh-indicator {
+  opacity: 1;
+}
+
+.authenticated-main[data-refresh-phase="armed"] .pull-to-refresh-arrow {
+  transform: rotate(180deg);
+}
+
+.pull-to-refresh-settling .pull-to-refresh-content,
+.pull-to-refresh-settling .pull-to-refresh-indicator,
+.pull-to-refresh-arrow {
+  transition: transform 200ms ease, opacity 160ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pull-to-refresh-settling .pull-to-refresh-content,
+  .pull-to-refresh-settling .pull-to-refresh-indicator,
+  .pull-to-refresh-arrow {
+    transition-duration: 0.01ms;
+  }
+
+  .pull-to-refresh-spinner {
+    animation: none;
+  }
+}
+
+.viewport-debug-trigger,
+.viewport-debug-panel {
+  position: fixed;
+  top: calc(var(--app-viewport-top, 0px) + max(0.5rem, env(safe-area-inset-top)));
+  z-index: 100;
+}
+
+.viewport-debug-trigger {
+  right: 0.5rem;
+  display: flex;
+  min-height: 2.25rem;
+  align-items: center;
+  gap: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 9999px;
+  background: rgba(15, 19, 24, 0.94);
+  padding: 0.45rem 0.7rem;
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 800;
+  box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.35);
+}
+
+.viewport-debug-panel {
+  right: 0.5rem;
+  left: 0.5rem;
+  max-height: calc(
+    var(--app-viewport-height, 100vh)
+    - max(1rem, calc(env(safe-area-inset-top) + 0.5rem))
+  );
+  overflow: auto;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
+  background: rgba(15, 19, 24, 0.97);
+  padding: 0.9rem;
+  color: white;
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.55);
+}
+
+.viewport-debug-icon-button,
+.viewport-debug-action {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.viewport-debug-icon-button {
+  width: 2.5rem;
+}
+
 .authenticated-main:not(:has(.safe-pt)):not(:has(.ios-safe-pt)) {
   padding-top: max(1rem, env(safe-area-inset-top));
 }

@@ -15,6 +15,11 @@ import { createClient } from "@/lib/supabase/client"
 import { toChatMessage } from "@/lib/supabase/mappers"
 import * as mutations from "@/lib/supabase/mutations"
 import { ensureProfile, fetchHuddleSnapshot } from "@/lib/supabase/queries"
+import {
+  createSingleFlight,
+  isRefreshScopeCurrent,
+  type SingleFlight,
+} from "@/lib/store/single-flight"
 import type { MessageRow } from "@/lib/types/database"
 import type {
   ActivityView,
@@ -213,24 +218,34 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const sessionUserId = state.session?.userId ?? null
   const loadedFor = useRef<string | null>(null)
+  const sessionGeneration = useRef(0)
+  const refreshFlight = useRef<SingleFlight<void> | null>(null)
+  if (!refreshFlight.current) {
+    refreshFlight.current = createSingleFlight<void>()
+  }
 
   const load = useCallback(async (identity: AuthenticatedIdentity) => {
+    refreshFlight.current?.reset()
+    loadedFor.current = null
+    const generation = ++sessionGeneration.current
     const supabase = createClient()
     const email = normalizeCampusEmail(identity.email) ?? identity.email
 
     await ensureProfile(supabase)
     const snapshot = await fetchHuddleSnapshot(supabase, identity.id)
 
-    loadedFor.current = identity.id
-    setState({
-      ...snapshot,
-      session: {
-        userId: identity.id,
-        email,
-        expiresAt: addDays(new Date(), SESSION_DAYS),
-        universityId: universityFor(email),
-      },
-    })
+    if (sessionGeneration.current === generation) {
+      loadedFor.current = identity.id
+      setState({
+        ...snapshot,
+        session: {
+          userId: identity.id,
+          email,
+          expiresAt: addDays(new Date(), SESSION_DAYS),
+          universityId: universityFor(email),
+        },
+      })
+    }
 
     return (
       snapshot.profiles.find((profile) => profile.userId === identity.id) ??
@@ -239,14 +254,27 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const refresh = useCallback(async () => {
-    const userId = loadedFor.current
-    if (!userId) {
-      return
-    }
+    await refreshFlight.current?.run(async () => {
+      const userId = loadedFor.current
+      if (!userId) {
+        return
+      }
+      const requestScope = {
+        userId,
+        generation: sessionGeneration.current,
+      }
 
-    const supabase = createClient()
-    const snapshot = await fetchHuddleSnapshot(supabase, userId)
-    setState((prev) => ({ ...snapshot, session: prev.session }))
+      const supabase = createClient()
+      const snapshot = await fetchHuddleSnapshot(supabase, userId)
+      if (!isRefreshScopeCurrent(
+        requestScope,
+        loadedFor.current,
+        sessionGeneration.current,
+      )) {
+        return
+      }
+      setState((prev) => ({ ...snapshot, session: prev.session }))
+    })
   }, [])
 
   // Restores the signed-in view on a hard refresh, so protected pages do not have to wait
@@ -354,6 +382,8 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   )
 
   const clearLocalSession = useCallback(() => {
+    refreshFlight.current?.reset()
+    sessionGeneration.current += 1
     loadedFor.current = null
     setState(EMPTY_STATE)
   }, [])
