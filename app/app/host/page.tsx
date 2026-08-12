@@ -21,6 +21,7 @@ export default function HostPage() {
   const [description, setDescription] = useState("")
   const [locationId, setLocationId] = useState(state.locations[0]?.id ?? "")
   const [startTime, setStartTime] = useState("")
+  const [isFlexible, setIsFlexible] = useState(false)
   const availabilityBlock = useMemo((): AvailabilityBlock => {
         if (!startTime) return "weekday_evening"
         const date = new Date(startTime)
@@ -44,7 +45,7 @@ export default function HostPage() {
     description.trim().length > 0 &&
     description.trim().length <= 500 &&
     (Boolean(locationId) || (useCustomLocation && customLocation.trim().length > 0)) &&
-    Boolean(startTime) &&
+    (Boolean(startTime) || isFlexible) &&
     capacity >= 2 &&
     capacity <= 8
 
@@ -82,7 +83,7 @@ export default function HostPage() {
           category,
           locationId,
           capacity,
-          startTime: date.toISOString(),
+          startTime: isFlexible ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : date.toISOString(),
           availabilityBlock,
           comfortSize,
           safetyPreference,
@@ -139,6 +140,7 @@ export default function HostPage() {
                   setCapacity(4)
                   setCustomLocation("")
                   setUseCustomLocation(false)
+                  setIsFlexible(false)
                 }}
                 className="rounded-2xl bg-secondary px-5 py-4 text-sm font-black text-secondary-foreground"
               >
@@ -252,19 +254,41 @@ export default function HostPage() {
 
         <section className="glass-card rounded-[2rem] p-5">
           <h2 className="font-heading text-lg font-bold text-white">Time and group</h2>
-          <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-white/46" htmlFor="startTime">
-            Date and time
-          </label>
-          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/8 px-4">
-            <CalendarClock className="h-5 w-5 text-secondary" />
-            <input
-              id="startTime"
-              type="datetime-local"
-              value={startTime}
-              onChange={(event) => setStartTime(event.target.value)}
-              className="min-h-12 flex-1 bg-transparent text-sm text-white outline-none"
-            />
+          <div className="mt-4 flex items-center justify-between">
+            <label className="text-xs font-semibold uppercase tracking-wide text-white/46" htmlFor="startTime">
+              Date and time
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/46">Flexible</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFlexible(!isFlexible)
+                  if (!isFlexible) setStartTime("")
+                }}
+                className={`relative h-6 w-11 rounded-full transition-colors ${isFlexible ? "bg-secondary" : "bg-white/20"}`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isFlexible ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
           </div>
+          {isFlexible ? (
+            <div className="mt-2 rounded-2xl border border-secondary/30 bg-secondary/10 px-4 py-3">
+              <p className="text-sm text-secondary font-semibold">Open schedule</p>
+              <p className="mt-1 text-xs text-white/56">Attendees will coordinate a time that works for everyone.</p>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/8 px-4">
+              <CalendarClock className="h-5 w-5 text-secondary" />
+              <input
+                id="startTime"
+                type="datetime-local"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+                className="min-h-12 flex-1 bg-transparent text-sm text-white outline-none"
+              />
+            </div>
+          )}
 
           {/*<h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-white/46">Availability block</h3>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
