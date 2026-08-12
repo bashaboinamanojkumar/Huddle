@@ -121,7 +121,6 @@ export default function HostPage() {
         </div>
       )}
 
-      
       {submitted && (
           <div className="flex min-h-[60vh] flex-col items-center justify-center text-center px-4">
             <img src="/ollie.png" alt="Ollie" className="h-32 w-32 object-contain mx-auto" style={{ mixBlendMode: "screen" }} />
