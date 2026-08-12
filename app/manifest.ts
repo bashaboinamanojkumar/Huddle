@@ -14,25 +14,25 @@ export default function manifest(): MetadataRoute.Manifest {
     categories: ["social", "education", "lifestyle"],
     icons: [
       {
-        src: "/icons/icon-192x192.png",
+        src: "/icons/huddle-app-v1-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/icon-192x192.png",
+        src: "/icons/huddle-app-maskable-v1-192.png",
         sizes: "192x192",
         type: "image/png",
         purpose: "maskable",
       },
       {
-        src: "/icons/icon-512x512.png",
+        src: "/icons/huddle-app-v1-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: "/icons/icon-512x512.png",
+        src: "/icons/huddle-app-maskable-v1-512.png",
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

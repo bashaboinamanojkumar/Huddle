@@ -1,5 +1,12 @@
-const CACHE_NAME = "huddle-shell-v3"
-const APP_SHELL = ["/", "/offline", "/icons/icon-192x192.png", "/icons/icon-512x512.png"]
+const CACHE_NAME = "huddle-shell-v4"
+const APP_SHELL = [
+  "/",
+  "/offline",
+  "/icons/huddle-app-v1-192.png",
+  "/icons/huddle-app-maskable-v1-192.png",
+  "/icons/huddle-app-v1-512.png",
+  "/icons/huddle-app-maskable-v1-512.png",
+]
 const NOTIFICATION_FALLBACK_PATH = "/app/notifications"
 const PUSH_PAYLOAD_KEYS = ["category", "notificationId", "path", "tag", "unreadCount"]
 const PUSH_COPY = {
@@ -172,8 +179,8 @@ self.addEventListener("push", (event) => {
   event.waitUntil((async () => {
     await self.registration.showNotification("Huddle", {
       body: payload.body,
-      icon: "/icons/icon-192x192.png",
-      badge: "/icons/icon-192x192.png",
+      icon: "/icons/huddle-app-v1-192.png",
+      badge: "/icons/huddle-app-v1-192.png",
       tag: payload.tag,
       renotify: true,
       data: {
