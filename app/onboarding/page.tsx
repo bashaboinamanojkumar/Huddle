@@ -118,7 +118,7 @@ export default function OnboardingPage() {
         comfortSize,
         safetyPreference,
       })
-      router.push("/app")
+      router.push("/onboarding/wellbeing")
     } catch {
       toast.error("Could not save your setup. Please try again.")
       setSaving(false)

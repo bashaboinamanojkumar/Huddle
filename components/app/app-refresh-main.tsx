@@ -282,7 +282,8 @@ export function AppRefreshMain({ children }: { children: React.ReactNode }) {
     <main
       ref={mainRef}
       data-refresh-phase={phase}
-      className="authenticated-main relative min-h-0 flex-1 overflow-y-auto pb-20"
+      className="authenticated-main relative min-h-0 flex-1 overflow-y-auto"
+      style={{ paddingBottom: "calc(5rem + env(safe-area-inset-bottom))" }}
       onTouchStart={onTouchStart}
       onTouchEnd={onTouchEnd}
       onTouchCancel={() => resetGesture()}

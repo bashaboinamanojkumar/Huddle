@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { ChevronRight, Share2, UserPlus } from "lucide-react"
 import { toast } from "sonner"
@@ -10,7 +10,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell"
 import { useHuddle } from "@/lib/store/huddle-store"
 
 export default function FeedPage() {
-  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend } = useHuddle()
+  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend, unfriend, sendDirectMessage, refresh } = useHuddle()
 
   const attendingActivities = useMemo(
     () => approvedActivities.filter((a) => a.userRsvp?.status === "going"),
@@ -74,14 +74,18 @@ export default function FeedPage() {
 
   const invite = () => toast("Invite link copied for the pilot demo.")
 
-  const sendRequest = async (friendId: string) => {
+  const sendRequest = async (friendId: string, message?: string) => {
     try {
-      await addFriend(friendId)
-      toast.success("Friend request sent.")
+      await addFriend(friendId, message)
+      toast.success("Friend request sent!")
+      setFriendMessage("")
+      setSendingTo(null)
     } catch {
-      toast.error("Could not send the request. Please try again.")
+      toast.error("Could not send request.")
     }
   }
+  const [friendMessage, setFriendMessage] = useState("")
+  const [sendingTo, setSendingTo] = useState<string | null>(null)
 
   return (
     <div className="min-h-full bg-background">
@@ -328,26 +332,45 @@ export default function FeedPage() {
             <h2 className="font-heading text-xl font-black text-white mb-3">You might know</h2>
             <div className="glass-card rounded-[2rem] overflow-hidden">
               {suggestions.map((profile) => (
-                <div key={profile.userId} className="flex items-center justify-between border-b border-white/8 px-4 py-3 last:border-b-0">
-                  <Link href={`/app/profile/${profile.userId}`} className="flex items-center gap-3 flex-1">
-                    <span
-                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
-                      style={{ backgroundColor: profile.photoColor }}
+                <div key={profile.userId} className="border-b border-white/8 last:border-b-0">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <Link href={`/app/profile/${profile.userId}`} className="flex items-center gap-3 flex-1">
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                        style={{ backgroundColor: profile.photoColor }}
+                      >
+                        {profile.displayName.charAt(0)}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-white">{profile.displayName}</p>
+                        <p className="text-xs text-white/42">{profile.meetupsThisWeek} meetups this week</p>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setSendingTo(sendingTo === profile.userId ? null : profile.userId)}
+                      className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
                     >
-                      {profile.displayName.charAt(0)}
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-white">{profile.displayName}</p>
-                      <p className="text-xs text-white/42">{profile.meetupsThisWeek} meetups this week</p>
+                      {sendingTo === profile.userId ? "Cancel" : "Add"}
+                    </button>
+                  </div>
+                  {sendingTo === profile.userId && (
+                    <div className="px-4 pb-3 flex gap-2">
+                      <input
+                        value={friendMessage}
+                        onChange={(e) => setFriendMessage(e.target.value)}
+                        placeholder="Add a message (optional)"
+                        className="flex-1 rounded-2xl border border-white/10 bg-white/8 px-3 py-2 text-sm text-white outline-none placeholder:text-white/34"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void sendRequest(profile.userId, friendMessage)}
+                        className="rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"
+                      >
+                        Send
+                      </button>
                     </div>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => void sendRequest(profile.userId)}
-                    className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
-                  >
-                    Add
-                  </button>
+                  )}
                 </div>
               ))}
             </div>

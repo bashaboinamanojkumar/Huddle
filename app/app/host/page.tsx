@@ -13,13 +13,15 @@ import type { AvailabilityBlock, Category, ComfortSize, SafetyPreference } from 
 
 export default function HostPage() {
   const { state, createActivity } = useHuddle()
-  const [createdId, setCreatedId] = useState<string | null>(null)
+  const userUniversityId = state.session?.email?.includes("umaryland.edu") ? "umb" : "umd"
+  const [submitted, setSubmitted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [category, setCategory] = useState<Category>("coffee")
   const [title, setTitle] = useState("")
   const [description, setDescription] = useState("")
   const [locationId, setLocationId] = useState(state.locations[0]?.id ?? "")
   const [startTime, setStartTime] = useState("")
+  const [isFlexible, setIsFlexible] = useState(false)
   const availabilityBlock = useMemo((): AvailabilityBlock => {
         if (!startTime) return "weekday_evening"
         const date = new Date(startTime)
@@ -33,14 +35,17 @@ export default function HostPage() {
   const [comfortSize, setComfortSize] = useState<ComfortSize>("medium")
   const [safetyPreference, setSafetyPreference] = useState<SafetyPreference>("none")
   const [customLocation, setCustomLocation] = useState("")
-const [useCustomLocation, setUseCustomLocation] = useState(false)
+  const [useCustomLocation, setUseCustomLocation] = useState(false)
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [recurrenceType, setRecurrenceType] = useState<"daily" | "weekly" | "biweekly">("weekly")
+  const [recurrenceCount, setRecurrenceCount] = useState(4)
   const canSubmit =
     title.trim().length >= 3 &&
     title.trim().length <= 80 &&
     description.trim().length > 0 &&
     description.trim().length <= 500 &&
     (Boolean(locationId) || (useCustomLocation && customLocation.trim().length > 0)) &&
-    Boolean(startTime) &&
+    (Boolean(startTime) || isFlexible) &&
     capacity >= 2 &&
     capacity <= 8
 
@@ -55,21 +60,36 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
 
     setSubmitting(true)
     try {
-      const activity = await createActivity({
-        title: title.trim(),
-        description: useCustomLocation && customLocation.trim()
+      const baseDescription = useCustomLocation && customLocation.trim()
         ? `${description.trim()}\n\nSuggested meet point: ${customLocation.trim()}`
-        : description.trim(),
-        category,
-        locationId,
-        capacity,
-        startTime: new Date(startTime).toISOString(),
-        availabilityBlock,
-        comfortSize,
-        safetyPreference,
-      })
-      setCreatedId(activity.id)
-      toast.success("Draft sent to review. It is hidden until approved.")
+        : description.trim()
+
+      const getDaysToAdd = () => {
+        if (recurrenceType === "daily") return 1
+        if (recurrenceType === "weekly") return 7
+        return 14
+      }
+
+      const occurrences = isRecurring ? recurrenceCount : 1
+
+      for (let i = 0; i < occurrences; i++) {
+        const date = new Date(startTime)
+        date.setDate(date.getDate() + i * getDaysToAdd())
+        await createActivity({
+          title: title.trim(),
+          description: isRecurring
+            ? `${baseDescription}\n\n📅 Occurrence ${i + 1} of ${occurrences}`
+            : baseDescription,
+          category,
+          locationId,
+          capacity,
+          startTime: isFlexible ? new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() : date.toISOString(),
+          availabilityBlock,
+          comfortSize,
+          safetyPreference,
+        })
+      }
+      setSubmitted(true)
     } catch {
       toast.error("Could not send your activity to review. Please try again.")
     } finally {
@@ -81,7 +101,7 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
     <div className="min-h-full bg-background px-5 py-5">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary">Host</p>
-        <h1 className="mt-1 font-heading text-3xl font-black text-white">Create a public activity</h1>
+        <h1 className="mt-1 font-heading text-3xl font-black text-white">Create a public activity ✨</h1>
         <p className="mt-2 text-sm leading-6 text-white/58">
           User-created events are held for human review before anyone else can see them.
         </p>
@@ -101,24 +121,40 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
         </div>
       )}
 
-      {createdId && (
-        <div className="mt-5 rounded-3xl border border-mint/20 bg-mint/10 p-4">
-          <div className="flex items-start gap-3">
-            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-mint" />
-            <div>
-              <p className="text-sm font-bold text-white">Pending review</p>
-              <p className="mt-1 text-xs leading-5 text-white/58">
-                This activity is hidden from other students until the review queue approves it.
-              </p>
-              <Link href="/app/admin/review" className="mt-3 inline-flex rounded-2xl bg-white px-4 py-2 text-xs font-bold text-black">
-                View review queue
+      {submitted && (
+          <div className="flex min-h-[60vh] flex-col items-center justify-center text-center px-4">
+            <img src="/ollie.png" alt="Ollie" className="h-32 w-32 object-contain mx-auto" style={{ mixBlendMode: "screen" }} />
+            <h2 className="mt-6 font-heading text-2xl font-black text-white">Thanks for your submission!</h2>
+            <p className="mt-3 text-sm leading-6 text-white/62">
+              Your event will be reviewed by the Huddle team before it goes live. We'll make sure it's a good fit for the community.
+            </p>
+            <div className="mt-8 flex flex-col gap-3 w-full max-w-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setSubmitted(false)
+                  setTitle("")
+                  setDescription("")
+                  setStartTime("")
+                  setCapacity(4)
+                  setCustomLocation("")
+                  setUseCustomLocation(false)
+                  setIsFlexible(false)
+                }}
+                className="rounded-2xl bg-secondary px-5 py-4 text-sm font-black text-secondary-foreground"
+              >
+                Create another event
+              </button>
+              <Link
+                href="/app"
+                className="rounded-2xl bg-white/10 px-5 py-4 text-sm font-bold text-white"
+              >
+                Back to home
               </Link>
             </div>
           </div>
-        </div>
       )}
-
-      <form onSubmit={submit} className="mt-5 space-y-5">
+      <form onSubmit={submit} className={`mt-5 space-y-5 ${submitted ? "hidden" : ""}`}>
         <section className="glass-card rounded-[2rem] p-5">
           <h2 className="font-heading text-lg font-bold text-white">Category</h2>
           <div className="mt-4 grid grid-cols-2 gap-3">
@@ -165,7 +201,7 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
         <section className="glass-card rounded-[2rem] p-5">
           <h2 className="font-heading text-lg font-bold text-white">Public location</h2>
           <div className="mt-4 grid gap-3">
-            {state.locations.map((location) => (
+            {state.locations.filter((location) => location.universityId === userUniversityId).map((location) => (
               <button
                 key={location.id}
                 type="button"
@@ -217,19 +253,41 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
 
         <section className="glass-card rounded-[2rem] p-5">
           <h2 className="font-heading text-lg font-bold text-white">Time and group</h2>
-          <label className="mt-4 block text-xs font-semibold uppercase tracking-wide text-white/46" htmlFor="startTime">
-            Date and time
-          </label>
-          <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/8 px-4">
-            <CalendarClock className="h-5 w-5 text-secondary" />
-            <input
-              id="startTime"
-              type="datetime-local"
-              value={startTime}
-              onChange={(event) => setStartTime(event.target.value)}
-              className="min-h-12 flex-1 bg-transparent text-sm text-white outline-none"
-            />
+          <div className="mt-4 flex items-center justify-between">
+            <label className="text-xs font-semibold uppercase tracking-wide text-white/46" htmlFor="startTime">
+              Date and time
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-white/46">Flexible</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsFlexible(!isFlexible)
+                  if (!isFlexible) setStartTime("")
+                }}
+                className={`relative h-6 w-11 rounded-full transition-colors ${isFlexible ? "bg-secondary" : "bg-white/20"}`}
+              >
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isFlexible ? "translate-x-5" : "translate-x-0.5"}`} />
+              </button>
+            </div>
           </div>
+          {isFlexible ? (
+            <div className="mt-2 rounded-2xl border border-secondary/30 bg-secondary/10 px-4 py-3">
+              <p className="text-sm text-secondary font-semibold">Open schedule</p>
+              <p className="mt-1 text-xs text-white/56">Attendees will coordinate a time that works for everyone.</p>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/8 px-4">
+              <CalendarClock className="h-5 w-5 text-secondary" />
+              <input
+                id="startTime"
+                type="datetime-local"
+                value={startTime}
+                onChange={(event) => setStartTime(event.target.value)}
+                className="min-h-12 flex-1 bg-transparent text-sm text-white outline-none"
+              />
+            </div>
+          )}
 
           {/*<h3 className="mt-5 text-xs font-semibold uppercase tracking-wide text-white/46">Availability block</h3>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
@@ -288,6 +346,61 @@ const [useCustomLocation, setUseCustomLocation] = useState(false)
               </button>
             ))}
           </div>
+        </section>
+                <section className="glass-card rounded-[2rem] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="font-heading text-lg font-bold text-white">Recurring event</h2>
+            <button
+              type="button"
+              onClick={() => setIsRecurring(!isRecurring)}
+              className={`relative h-6 w-11 rounded-full transition-colors ${isRecurring ? "bg-secondary" : "bg-white/20"}`}
+            >
+              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isRecurring ? "translate-x-5" : "translate-x-0.5"}`} />
+            </button>
+          </div>
+          <p className="mt-1 text-xs text-white/46">Create multiple events on a repeating schedule</p>
+
+          {isRecurring && (
+            <div className="mt-4 space-y-4">
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-white/46 mb-2">Repeat</h3>
+                <div className="grid grid-cols-3 gap-2">
+                  {(["daily", "weekly", "biweekly"] as const).map((type) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setRecurrenceType(type)}
+                      className={`rounded-2xl px-3 py-3 text-xs font-bold capitalize ${
+                        recurrenceType === type ? "bg-secondary text-secondary-foreground" : "bg-white/8 text-white/60"
+                      }`}
+                    >
+                      {type === "biweekly" ? "Bi-weekly" : type.charAt(0).toUpperCase() + type.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-white/46 mb-2">
+                  Number of occurrences: {recurrenceCount}
+                </h3>
+                <input
+                  type="range"
+                  min={2}
+                  max={12}
+                  value={recurrenceCount}
+                  onChange={(e) => setRecurrenceCount(Number(e.target.value))}
+                  className="w-full accent-secondary"
+                />
+                <div className="flex justify-between text-xs text-white/40 mt-1">
+                  <span>2</span>
+                  <span>12</span>
+                </div>
+              </div>
+              <p className="text-xs text-white/46">
+                This will create {recurrenceCount} separate events starting from your selected date.
+              </p>
+            </div>
+          )}
         </section>
 
         <div className="rounded-3xl border border-coral/20 bg-coral/10 p-4">
