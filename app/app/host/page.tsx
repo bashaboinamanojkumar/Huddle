@@ -266,9 +266,9 @@ export default function HostPage() {
                   setIsFlexible(!isFlexible)
                   if (!isFlexible) setStartTime("")
                 }}
-                className={`relative h-6 w-11 rounded-full transition-colors ${isFlexible ? "bg-secondary" : "bg-white/20"}`}
+                className={`rounded-2xl px-4 py-2 text-xs font-bold transition-colors ${isFlexible ? "bg-secondary text-secondary-foreground" : "bg-white/10 text-white/60"}`}
               >
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isFlexible ? "translate-x-5" : "translate-x-0.5"}`} />
+                {isFlexible ? "On" : "Off"}
               </button>
             </div>
           </div>
@@ -354,9 +354,9 @@ export default function HostPage() {
             <button
               type="button"
               onClick={() => setIsRecurring(!isRecurring)}
-              className={`relative h-6 w-11 rounded-full transition-colors ${isRecurring ? "bg-secondary" : "bg-white/20"}`}
+              className={`rounded-2xl px-4 py-2 text-xs font-bold transition-colors ${isRecurring ? "bg-secondary text-secondary-foreground" : "bg-white/10 text-white/60"}`}
             >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${isRecurring ? "translate-x-5" : "translate-x-0.5"}`} />
+              {isRecurring ? "On" : "Off"}
             </button>
           </div>
           <p className="mt-1 text-xs text-white/46">Create multiple events on a repeating schedule</p>
