@@ -101,7 +101,7 @@ export default function HostPage() {
     <div className="min-h-full bg-background px-5 py-5">
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-secondary">Host</p>
-        <h1 className="mt-1 font-heading text-3xl font-black text-white">Create a public activity ✨</h1>
+        <h1 className="mt-1 font-heading text-3xl font-black text-white">Create a public activity</h1>
         <p className="mt-2 text-sm leading-6 text-white/58">
           User-created events are held for human review before anyone else can see them.
         </p>
