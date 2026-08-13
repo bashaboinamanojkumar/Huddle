@@ -1,7 +1,9 @@
 "use client"
 
 import { BottomNav } from "@/components/app/bottom-nav"
+import { AppRefreshMain } from "@/components/app/app-refresh-main"
 import { PhoneFrame } from "@/components/layout/phone-frame"
+import { AppViewportController } from "@/components/layout/app-viewport-controller"
 import { SessionGuard } from "@/components/auth/session-guard"
 import { NotificationProvider } from "@/lib/notifications/notification-provider"
 
@@ -10,11 +12,12 @@ import { PromptCoordinator } from "@/components/pwa/prompt-coordinator"
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <PhoneFrame>
+      <AppViewportController />
       <SessionGuard>
         <NotificationProvider>
-          <main className="authenticated-main min-h-0 flex-1 overflow-y-auto" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}>
+          <AppRefreshMain>
             {children}
-          </main>
+          </AppRefreshMain>
           <div className="shrink-0">
             <BottomNav />
           </div>

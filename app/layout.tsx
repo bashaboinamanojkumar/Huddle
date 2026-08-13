@@ -21,11 +21,12 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/icon.svg',
-        type: 'image/svg+xml',
+        url: '/icons/huddle-app-favicon-v1-32.png',
+        type: 'image/png',
+        sizes: '32x32',
       },
     ],
-    apple: '/icons/icon-192x192.png',
+    apple: '/icons/huddle-app-apple-v1-180.png',
   },
 }
 

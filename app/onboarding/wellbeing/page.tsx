@@ -269,7 +269,7 @@ export default function WellbeingCheckinPage() {
               <div className="mt-6 rounded-2xl bg-secondary/10 border border-secondary/20 p-4 text-left">
                 <p className="text-sm text-white/80 leading-6">
                   Sounds like things might be heavy right now. If you'd like to talk to someone,{" "}
-                  
+
                     <a href="https://counseling.umd.edu"
                     target="_blank"
                     rel="noopener noreferrer"

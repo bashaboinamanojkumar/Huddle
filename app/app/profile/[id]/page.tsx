@@ -36,7 +36,6 @@ export default function StudentProfilePage() {
   const { state, currentUserId, approvedActivities, addFriend, acceptFriend, declineFriend, unfriend, sendDirectMessage } = useHuddle()
 
   const profile = state.profiles.find((p) => p.userId === params.id)
-  
 
   const friendConnection = useMemo(
     () => state.friends.find(
@@ -87,7 +86,7 @@ export default function StudentProfilePage() {
   }
 
   const isMe = profile.userId === currentUserId
-  
+
   return (
     <div className="min-h-full bg-background">
       <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-7">

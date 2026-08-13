@@ -63,6 +63,14 @@ describe("service worker authentication boundaries", () => {
 
     expect(addAll).toHaveBeenCalledOnce()
     expect(addAll.mock.calls[0][0]).not.toContain("/app")
+    expect(addAll).toHaveBeenCalledWith([
+      "/",
+      "/offline",
+      "/icons/huddle-app-v1-192.png",
+      "/icons/huddle-app-maskable-v1-192.png",
+      "/icons/huddle-app-v1-512.png",
+      "/icons/huddle-app-maskable-v1-512.png",
+    ])
   })
 
   it("never serves a cached protected page while offline", async () => {
