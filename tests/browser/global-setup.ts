@@ -93,7 +93,7 @@ export default async function globalSetup(): Promise<void> {
     ) values
       (
         '${DETAIL_ACTIVITY_ID}', 'Browser Detail Huddle', 'A deterministic browser fixture.',
-        'coffee', '${FIXTURE_LOCATION_ID}', '${userId}', 4, now() + interval '1 day',
+        'coffee', '${FIXTURE_LOCATION_ID}', '${userId}', 4, now() + interval '7 days',
         'weekday_afternoon', 'seeded', 'approved', 'umd'
       ),
       (

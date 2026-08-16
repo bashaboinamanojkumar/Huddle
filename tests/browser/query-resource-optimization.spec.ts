@@ -4,8 +4,11 @@ import {
   FIXTURE_EMAIL,
   FIXTURE_PASSWORD,
   FRIEND_CONNECTION_ID,
+  FIXTURE_LOCATION_ID,
   PAST_ACTIVITY_ID,
+  PENDING_ACTIVITY_ID,
   RSVP_ACTIVITY_ID,
+  SAFETY_FLAG_ID,
   SECOND_FIXTURE_USER_ID,
   runFixtureSql,
 } from "./fixture"
@@ -129,6 +132,69 @@ async function attachRequestEvidence(page: Page, requests: RestRequest[]): Promi
     contentType: "application/json",
   })
 }
+
+function resetMutationFixtures(): void {
+  runFixtureSql(`
+    do $$
+    declare
+      fixture_user_id uuid;
+    begin
+      select id into strict fixture_user_id
+      from auth.users
+      where email = '${FIXTURE_EMAIL}';
+
+      delete from public.messages
+      where activity_id = '${DETAIL_ACTIVITY_ID}'
+        and user_id = fixture_user_id
+        and body = 'Scoped browser message';
+
+      delete from public.pulses
+      where activity_id = '${PAST_ACTIVITY_ID}'
+        and user_id = fixture_user_id;
+
+      delete from public.rsvps
+      where activity_id = '${RSVP_ACTIVITY_ID}'
+        and user_id = fixture_user_id;
+
+      delete from public.safety_flags
+      where type = 'event'
+        and ref_id in (
+          select id
+          from public.activities
+          where location_id = '${FIXTURE_LOCATION_ID}'
+            and title = 'Browser scoped creation'
+        );
+
+      delete from public.activities
+      where location_id = '${FIXTURE_LOCATION_ID}'
+        and title = 'Browser scoped creation';
+
+      update public.activities
+      set status = 'pending'
+      where id = '${PENDING_ACTIVITY_ID}';
+
+      update public.safety_flags
+      set status = 'open', reviewer = null, resolved_at = null
+      where id = '${SAFETY_FLAG_ID}'
+         or (type = 'event' and ref_id = '${PENDING_ACTIVITY_ID}');
+
+      delete from public.friend_connections
+      where (user_id = fixture_user_id and friend_id = '${SECOND_FIXTURE_USER_ID}')
+         or (user_id = '${SECOND_FIXTURE_USER_ID}' and friend_id = fixture_user_id);
+
+      insert into public.friend_connections (id, user_id, friend_id, status)
+      values (
+        '${FRIEND_CONNECTION_ID}', fixture_user_id,
+        '${SECOND_FIXTURE_USER_ID}', 'accepted'
+      );
+    end
+    $$;
+  `)
+}
+
+test.beforeEach(() => {
+  resetMutationFixtures()
+})
 
 test("authenticated boot and pull refresh stay inside the six-request core budget", async ({ page }) => {
   const requests = recordRestRequests(page)
