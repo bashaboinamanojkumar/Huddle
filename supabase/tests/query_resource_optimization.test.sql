@@ -1,5 +1,5 @@
 begin;
-select plan(18);
+select plan(22);
 
 -- 1
 select has_index(
@@ -434,6 +434,100 @@ select results_eq(
     ('activities_university_approved_start_idx'::name, true),
     ('safety_reports_open_created_idx'::name, true)$$,
   'optimization indexes match the final filter and ordering predicates'
+);
+
+insert into auth.users (
+  instance_id, id, aud, role, email, encrypted_password,
+  email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+  created_at, updated_at
+)
+values
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '89000000-0000-4000-8000-000000000001',
+    'authenticated', 'authenticated', 'friend-delete-sender@umd.edu', '', now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Friend Delete Sender"}'::jsonb,
+    now(), now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '89000000-0000-4000-8000-000000000002',
+    'authenticated', 'authenticated', 'friend-delete-recipient@umd.edu', '', now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Friend Delete Recipient"}'::jsonb,
+    now(), now()
+  ),
+  (
+    '00000000-0000-0000-0000-000000000000',
+    '89000000-0000-4000-8000-000000000003',
+    'authenticated', 'authenticated', 'friend-delete-outsider@umd.edu', '', now(),
+    '{"provider":"google","providers":["google"]}'::jsonb,
+    '{"full_name":"Friend Delete Outsider"}'::jsonb,
+    now(), now()
+  );
+
+insert into public.friend_connections (id, user_id, friend_id, status)
+values
+  (
+    '89000000-0000-4000-8000-000000000004',
+    '89000000-0000-4000-8000-000000000001',
+    '89000000-0000-4000-8000-000000000002',
+    'accepted'
+  ),
+  (
+    '89000000-0000-4000-8000-000000000005',
+    '89000000-0000-4000-8000-000000000002',
+    '89000000-0000-4000-8000-000000000001',
+    'pending'
+  );
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"89000000-0000-4000-8000-000000000002","app_metadata":{"role":"student"}}',
+  true
+);
+set local role authenticated;
+
+-- 19
+select lives_ok(
+  $$delete from public.friend_connections
+    where id = '89000000-0000-4000-8000-000000000004'$$,
+  'either participant can delete an existing friendship'
+);
+
+reset role;
+
+-- 20
+select results_eq(
+  $$select count(*)::integer from public.friend_connections
+    where id = '89000000-0000-4000-8000-000000000004'$$,
+  $$values (0)$$,
+  'participant deletion removes the friendship'
+);
+
+select set_config(
+  'request.jwt.claims',
+  '{"sub":"89000000-0000-4000-8000-000000000003","app_metadata":{"role":"student"}}',
+  true
+);
+set local role authenticated;
+
+-- 21
+select lives_ok(
+  $$delete from public.friend_connections
+    where id = '89000000-0000-4000-8000-000000000005'$$,
+  'an unrelated authenticated user receives an RLS-filtered delete result'
+);
+
+reset role;
+
+-- 22
+select results_eq(
+  $$select count(*)::integer from public.friend_connections
+    where id = '89000000-0000-4000-8000-000000000005'$$,
+  $$values (1)$$,
+  'RLS prevents an unrelated user from deleting a connection'
 );
 
 select * from finish();

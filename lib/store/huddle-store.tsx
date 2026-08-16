@@ -717,7 +717,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const unfriend = useCallback(
     async (friendId: string) => {
       const supabase = createClient()
-      await mutations.unfriend(supabase, friendId)
+      await mutations.unfriend(supabase, requireUser(), friendId)
       setState((current) => {
         const connection = current.friends.find(
           ({ userId, friendId: connectedId }) =>

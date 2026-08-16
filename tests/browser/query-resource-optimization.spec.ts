@@ -75,6 +75,12 @@ function coreRequests(requests: RestRequest[]): RestRequest[] {
   )
 }
 
+async function waitForCoreSnapshot(requests: RestRequest[]): Promise<void> {
+  await expect.poll(() =>
+    new Set(coreRequests(requests).map(({ table }) => table)).size
+  ).toBe(CORE_TABLES.length)
+}
+
 function expectNoWildcardSelect(requests: RestRequest[]): void {
   expect(requests.some(({ url }) => new URL(url).searchParams.get("select") === "*"))
     .toBe(false)
@@ -265,6 +271,7 @@ test("past pulse, RSVP, activity creation, and friendship mutations avoid core r
 
   await page.goto(`/app/activity/${RSVP_ACTIVITY_ID}`)
   await expect(page.getByRole("heading", { name: "Browser RSVP Huddle" })).toBeVisible()
+  await waitForCoreSnapshot(requests)
   requests.length = 0
   const rsvpResponse = page.waitForResponse((response) =>
     response.url().includes("/rest/v1/rpc/rsvp_activity")
@@ -283,7 +290,9 @@ test("past pulse, RSVP, activity creation, and friendship mutations avoid core r
   await leaveResponse
   expect(coreRequests(requests)).toEqual([])
 
-  await page.goto("/app/host")
+  await page.getByRole("link", { name: "Host" }).click()
+  await page.waitForURL("/app/host")
+  await expect(page.getByRole("heading", { name: "Create a public activity" })).toBeVisible()
   requests.length = 0
   await page.getByLabel(/Title/u).fill("Browser scoped creation")
   await page.getByLabel(/Short description/u).fill("Created without a core reload.")
@@ -300,13 +309,16 @@ test("past pulse, RSVP, activity creation, and friendship mutations avoid core r
 
   await page.goto(`/app/profile/${SECOND_FIXTURE_USER_ID}`)
   await expect(page.getByRole("heading", { name: "Friend T." })).toBeVisible()
+  await waitForCoreSnapshot(requests)
   requests.length = 0
   const unfriendResponse = page.waitForResponse((response) =>
-    response.url().includes("/rest/v1/rpc/unfriend")
-      && response.request().method() === "POST"
+    response.url().includes("/rest/v1/friend_connections")
+      && response.request().method() === "DELETE"
   )
+  const backToHost = page.waitForURL("/app/host")
   await page.getByRole("button", { name: "Unfriend" }).click()
-  await unfriendResponse
+  expect((await unfriendResponse).ok()).toBe(true)
+  await backToHost
   expect(coreRequests(requests)).toEqual([])
 
   runFixtureSql(`
@@ -320,13 +332,14 @@ test("past pulse, RSVP, activity creation, and friendship mutations avoid core r
   `)
   await page.goto(`/app/profile/${SECOND_FIXTURE_USER_ID}`)
   await expect(page.getByRole("button", { name: "Accept request" })).toBeVisible()
+  await waitForCoreSnapshot(requests)
   requests.length = 0
   const acceptResponse = page.waitForResponse((response) =>
     response.url().includes("/rest/v1/friend_connections")
       && response.request().method() === "PATCH"
   )
   await page.getByRole("button", { name: "Accept request" }).click()
-  await acceptResponse
+  expect((await acceptResponse).ok()).toBe(true)
   expect(coreRequests(requests)).toEqual([])
 
   runFixtureSql(`
@@ -341,14 +354,15 @@ test("past pulse, RSVP, activity creation, and friendship mutations avoid core r
     );
   `)
   await page.reload()
-  await expect(page.getByRole("button", { name: "Decline request" })).toBeVisible()
+  await expect(page.getByRole("button", { name: "Decline", exact: true })).toBeVisible()
+  await waitForCoreSnapshot(requests)
   requests.length = 0
   const declineResponse = page.waitForResponse((response) =>
     response.url().includes("/rest/v1/friend_connections")
       && response.request().method() === "DELETE"
   )
-  await page.getByRole("button", { name: "Decline request" }).click()
-  await declineResponse
+  await page.getByRole("button", { name: "Decline", exact: true }).click()
+  expect((await declineResponse).ok()).toBe(true)
   expect(coreRequests(requests)).toEqual([])
   expectNoWildcardSelect(requests)
 })

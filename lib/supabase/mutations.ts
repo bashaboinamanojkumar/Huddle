@@ -366,9 +366,17 @@ export async function sendDirectMessage(
 
 export async function unfriend(
   supabase: HuddleBrowserClient,
+  userId: string,
   friendId: string
 ): Promise<string> {
-  const { error } = await supabase.rpc('unfriend' as any, { p_friend_id: friendId })
-  throwOnError(error, 'Could not unfriend')
+  const { error } = await supabase
+    .from("friend_connections")
+    .delete()
+    .or(
+      `and(user_id.eq.${userId},friend_id.eq.${friendId}),`
+      + `and(user_id.eq.${friendId},friend_id.eq.${userId})`
+    )
+
+  throwOnError(error, "Could not unfriend")
   return friendId
 }
