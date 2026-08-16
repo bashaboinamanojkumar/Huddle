@@ -3956,6 +3956,22 @@ select results_eq(
   'exactly one retry job and one cleanup job are installed'
 );
 
+update public.notification_runtime_config
+set notification_core_enabled = true,
+    push_enabled = true,
+    push_rollout_percentage = 100
+where id;
+
+update public.push_subscriptions
+set disabled_at = null
+where id = '10000000-0000-4000-8000-000000000003';
+
+update public.notification_deliveries
+set state = 'pending',
+    deliver_after = now(),
+    claimed_at = null
+where id = '10000000-0000-4000-8000-000000000004';
+
 select results_eq(
   $$select public.request_push_dispatch() ->> 'status'$$,
   $$values ('not_configured'::text)$$,
