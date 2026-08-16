@@ -5,11 +5,13 @@ import {
   CHAT_PREVIEW_MESSAGE_LIMIT,
   CORE_TABLES,
   PROFILE_COLUMNS,
+  RSVP_COLUMNS,
   SAFETY_QUEUE_LIMIT,
 } from "@/lib/supabase/query-contracts"
 import {
   fetchActivityById,
   fetchActivityMessagePage,
+  fetchActivityRsvpByUser,
   fetchChatPreviews,
   fetchCoreHuddleSnapshot,
   fetchProfileById,
@@ -415,6 +417,19 @@ describe("feature-owned Supabase loaders", () => {
     expect(calls).toHaveLength(1)
     expect(calls[0].filters).toContainEqual(["eq", "id", "activity-1"])
     expect(activity?.id).toBe("activity-1")
+  })
+
+  it("loads only the viewer RSVP for an out-of-window activity", async () => {
+    const { client, calls } = recordingClient({ rsvps: [rsvpRow()] })
+    const rsvp = await fetchActivityRsvpByUser(client, "activity-1", "user-1")
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].select).toBe(RSVP_COLUMNS)
+    expect(calls[0].filters).toEqual([
+      ["eq", "activity_id", "activity-1"],
+      ["eq", "user_id", "user-1"],
+    ])
+    expect(rsvp).toMatchObject({ activityId: "activity-1", userId: "user-1" })
   })
 
   it("loads a mapped public profile with the protected projection", async () => {

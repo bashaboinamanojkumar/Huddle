@@ -317,6 +317,22 @@ export async function fetchActivityById(
   return data ? toHuddleActivity(data) : null
 }
 
+export async function fetchActivityRsvpByUser(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+  userId: string,
+): Promise<HuddleRsvp | null> {
+  const { data, error } = await supabase
+    .from("rsvps")
+    .select(RSVP_COLUMNS)
+    .eq("activity_id", activityId)
+    .eq("user_id", userId)
+    .maybeSingle()
+
+  throwOnError(error, "Could not load your RSVP")
+  return data ? toHuddleRsvp(data) : null
+}
+
 export async function fetchProfileById(
   supabase: HuddleBrowserClient,
   userId: string,

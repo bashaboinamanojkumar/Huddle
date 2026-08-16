@@ -2,11 +2,18 @@ import { createClient } from "@supabase/supabase-js"
 import {
   cleanupFixtureSql,
   DETAIL_ACTIVITY_ID,
+  FRIEND_CONNECTION_ID,
   FIXTURE_EMAIL,
   FIXTURE_LOCATION_ID,
   FIXTURE_PASSWORD,
   INELIGIBLE_ACTIVITY_ID,
+  PAST_ACTIVITY_ID,
+  PENDING_ACTIVITY_ID,
   RSVP_ACTIVITY_ID,
+  SAFETY_FLAG_ID,
+  SAFETY_REPORT_ID,
+  SECOND_FIXTURE_EMAIL,
+  SECOND_FIXTURE_USER_ID,
   runFixtureSql,
 } from "./fixture"
 
@@ -26,6 +33,7 @@ export default async function globalSetup(): Promise<void> {
     email: FIXTURE_EMAIL,
     password: FIXTURE_PASSWORD,
     email_confirm: true,
+    app_metadata: { role: "safety_owner" },
     user_metadata: { full_name: "Browser Fixture" },
   })
   if (error || !data.user) throw new Error(error?.message ?? "Could not create browser user")
@@ -44,6 +52,19 @@ export default async function globalSetup(): Promise<void> {
 
   const userId = data.user.id
   runFixtureSql(`
+    insert into auth.users (
+      instance_id, id, aud, role, email, encrypted_password,
+      email_confirmed_at, raw_app_meta_data, raw_user_meta_data,
+      created_at, updated_at
+    ) values (
+      '00000000-0000-0000-0000-000000000000',
+      '${SECOND_FIXTURE_USER_ID}', 'authenticated', 'authenticated',
+      '${SECOND_FIXTURE_EMAIL}', '', now(),
+      '{"provider":"google","providers":["google"]}'::jsonb,
+      '{"full_name":"Browser Friend"}'::jsonb,
+      now(), now()
+    );
+
     update public.profiles
     set first_name = 'Browser',
         last_initial = 'F',
@@ -51,6 +72,14 @@ export default async function globalSetup(): Promise<void> {
         interests = array['coffee']::public.category[],
         availability_blocks = array['weekday_afternoon']::public.availability_block[]
     where id = '${userId}';
+
+    update public.profiles
+    set first_name = 'Friend',
+        last_initial = 'T',
+        completed_onboarding = true,
+        interests = array['coffee']::public.category[],
+        availability_blocks = array['weekday_afternoon']::public.availability_block[]
+    where id = '${SECOND_FIXTURE_USER_ID}';
 
     insert into public.locations (id, university_id, name, area, safety_note)
     values (
@@ -76,10 +105,58 @@ export default async function globalSetup(): Promise<void> {
         '${INELIGIBLE_ACTIVITY_ID}', 'Browser Ineligible Pulse', 'No RSVP exists for this fixture.',
         'coffee', '${FIXTURE_LOCATION_ID}', '${userId}', 4, now() + interval '3 days',
         'weekday_afternoon', 'seeded', 'approved', 'umd'
+      ),
+      (
+        '${PAST_ACTIVITY_ID}', 'Browser Past Huddle', 'Used for focused pulse deep links.',
+        'coffee', '${FIXTURE_LOCATION_ID}', '${userId}', 4, now() - interval '1 day',
+        'weekday_afternoon', 'seeded', 'approved', 'umd'
+      ),
+      (
+        '${PENDING_ACTIVITY_ID}', 'Browser Pending Review', 'Used for the safety-owner queue.',
+        'coffee', '${FIXTURE_LOCATION_ID}', '${userId}', 4, now() + interval '4 days',
+        'weekday_afternoon', 'user', 'pending', 'umd'
       );
 
     insert into public.rsvps (activity_id, user_id, status)
-    values ('${DETAIL_ACTIVITY_ID}', '${userId}', 'going');
+    values
+      ('${DETAIL_ACTIVITY_ID}', '${userId}', 'going'),
+      ('${DETAIL_ACTIVITY_ID}', '${SECOND_FIXTURE_USER_ID}', 'going'),
+      ('${PAST_ACTIVITY_ID}', '${userId}', 'going');
+
+    insert into public.messages (
+      id, activity_id, user_id, body, flagged, created_at
+    ) values
+      (
+        '99600000-0000-4000-8000-000000000001',
+        '${DETAIL_ACTIVITY_ID}', '${SECOND_FIXTURE_USER_ID}',
+        'Browser fixture hello', false, now() - interval '2 minutes'
+      ),
+      (
+        '99600000-0000-4000-8000-000000000002',
+        '${DETAIL_ACTIVITY_ID}', '${userId}',
+        'Browser fixture logistics', false, now() - interval '1 minute'
+      );
+
+    insert into public.friend_connections (
+      id, user_id, friend_id, status
+    ) values (
+      '${FRIEND_CONNECTION_ID}', '${userId}', '${SECOND_FIXTURE_USER_ID}', 'accepted'
+    );
+
+    insert into public.safety_reports (
+      id, reporter_id, reported_user_id, context, status
+    ) values (
+      '${SAFETY_REPORT_ID}', '${userId}', '${SECOND_FIXTURE_USER_ID}',
+      'Browser fixture safety report', 'open'
+    );
+
+    insert into public.safety_flags (
+      id, type, ref_id, reason, status
+    ) values (
+      '${SAFETY_FLAG_ID}', 'chat',
+      '99600000-0000-4000-8000-000000000001',
+      'Browser message flag', 'open'
+    );
 
     insert into public.notifications (
       id, user_id, type, category, title, body, url, data, dedupe_key,

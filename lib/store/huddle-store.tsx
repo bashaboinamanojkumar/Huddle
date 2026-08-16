@@ -17,6 +17,7 @@ import * as mutations from "@/lib/supabase/mutations"
 import {
   fetchActivityById,
   fetchActivityMessagePage,
+  fetchActivityRsvpByUser,
   fetchChatPreviews,
   fetchCoreHuddleSnapshot,
   fetchProfileById,
@@ -421,14 +422,19 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   ): Promise<HuddleActivity | null> => {
     const generation = sessionGeneration.current
     return featureFlights.current!.run(`activity:${activityId}`, async () => {
-      const activity = await fetchActivityById(createClient(), activityId)
+      const supabase = createClient()
+      const userId = loadedFor.current
+      const [activity, rsvp] = await Promise.all([
+        fetchActivityById(supabase, activityId),
+        userId
+          ? fetchActivityRsvpByUser(supabase, activityId, userId)
+          : Promise.resolve(null),
+      ])
       if (activity && sessionGeneration.current === generation) {
-        setState((previous) => ({
-          ...previous,
-          activities: previous.activities.some(({ id }) => id === activity.id)
-            ? previous.activities.map((item) => item.id === activity.id ? activity : item)
-            : [...previous.activities, activity],
-        }))
+        setState((previous) => {
+          const withActivity = mergeActivities(previous, activity)
+          return rsvp ? mergeRsvp(withActivity, rsvp) : withActivity
+        })
       }
       return activity
     })
