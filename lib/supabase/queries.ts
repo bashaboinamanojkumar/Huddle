@@ -1,5 +1,6 @@
 import type { PostgrestError } from "@supabase/supabase-js"
 import type { HuddleBrowserClient } from "@/lib/supabase/client"
+import { PROFILE_COLUMNS } from "@/lib/supabase/query-contracts"
 import {
   toChatMessage,
   toFriendConnection,
@@ -26,16 +27,6 @@ import type {
   SafetyFlag,
   SafetyReport,
 } from "@/lib/types/huddle"
-
-/**
- * The authenticated role has no column grant on `email`, so it must stay out of every
- * client-side select or PostgREST rejects the whole request.
- */
-const PROFILE_COLUMNS =
-  "id, first_name, last_name, last_initial, display_name, username, avatar_url, bio, " +
-  "graduation_year, major, minor, is_verified, status, interests, availability_blocks, " +
-  "comfort_size, safety_preference, photo_color, points, streak_days, meetups_this_week, " +
-  "completed_onboarding, university_id, cohort, created_at, updated_at"
 
 export interface HuddleSnapshot {
   profiles: HuddleProfile[]
