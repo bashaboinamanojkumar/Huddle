@@ -30,6 +30,17 @@ import {
   type FeatureFlights,
   type SingleFlight,
 } from "@/lib/store/single-flight"
+import {
+  mergeActivities,
+  mergeFlags,
+  mergeFriends,
+  mergeMessages,
+  mergeProfiles,
+  mergeReports,
+  mergeRsvp,
+  removeFriend,
+  removeRsvp,
+} from "@/lib/store/huddle-state"
 import type { MessageRow } from "@/lib/types/database"
 import type {
   ActivityView,
@@ -566,40 +577,53 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const completeOnboarding = useCallback(
     async (input: OnboardingInput) => {
       const supabase = createClient()
-      await mutations.completeOnboarding(supabase, requireUser(), input)
-      await refresh()
+      const profile = await mutations.completeOnboarding(supabase, requireUser(), input)
+      setState((current) => mergeProfiles(current, profile))
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const updateProfile = useCallback(
     async (updates: Partial<HuddleProfile>) => {
       const supabase = createClient()
-      await mutations.updateProfile(supabase, requireUser(), updates)
-      await refresh()
+      const profile = await mutations.updateProfile(supabase, requireUser(), updates)
+      setState((current) => {
+        const existing = current.profiles.find(({ userId }) => userId === profile.userId)
+        const reconciled = profile.gender === undefined && existing?.gender !== undefined
+          ? { ...profile, gender: existing.gender }
+          : profile
+        return mergeProfiles(current, reconciled)
+      })
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const rsvpActivity = useCallback(
     async (activityId: string) => {
       const supabase = createClient()
-      requireUser()
+      const userId = requireUser()
       const outcome = await mutations.rsvpActivity(supabase, activityId)
-      await refresh()
+      if (outcome !== "full") {
+        setState((current) => mergeRsvp(current, {
+          activityId,
+          userId,
+          status: outcome,
+          timestamp: new Date().toISOString(),
+        }))
+      }
       return outcome
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const leaveActivity = useCallback(
     async (activityId: string) => {
       const supabase = createClient()
-      requireUser()
+      const userId = requireUser()
       await mutations.leaveActivity(supabase, activityId)
-      await refresh()
+      setState((current) => removeRsvp(current, activityId, userId))
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const createActivity = useCallback(
@@ -612,10 +636,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
         state.session?.universityId ?? "umd",
         input
       )
-      await refresh()
+      setState((current) => mergeActivities(current, activity))
       return activity
     },
-    [refresh, requireUser, state.session?.universityId]
+    [requireUser, state.session?.universityId]
   )
 
   const sendMessage = useCallback(
@@ -628,11 +652,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
         body
       )
 
-      setState((prev) =>
-        prev.messages.some((item) => item.id === message.id)
-          ? prev
-          : { ...prev, messages: [...prev.messages, message] }
-      )
+      setState((current) => mergeMessages(current, message))
 
       return message
     },
@@ -648,27 +668,33 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
         context,
         reportedUserId
       )
-      await refresh()
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const resolveFlag = useCallback(
     async (flagId: string, status: SafetyFlag["status"]) => {
       const supabase = createClient()
-      await mutations.resolveFlag(supabase, flagId, status)
-      await refresh()
+      const flag = await mutations.resolveFlag(supabase, flagId, status)
+      setState((current) => {
+        let next = mergeFlags(current, flag)
+        if (flag.type === "report") {
+          const report = current.reports.find(({ id }) => id === flag.refId)
+          if (report) next = mergeReports(next, { ...report, status: flag.status })
+        }
+        return next
+      })
     },
-    [refresh]
+    []
   )
 
   const reviewActivity = useCallback(
     async (activityId: string, status: "approved" | "rejected") => {
       const supabase = createClient()
-      await mutations.reviewActivity(supabase, activityId, status)
-      await refresh()
+      const activity = await mutations.reviewActivity(supabase, activityId, status)
+      setState((current) => mergeActivities(current, activity))
     },
-    [refresh]
+    []
   )
 
   const addFriend = useCallback(
@@ -676,7 +702,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient()
       const connection = await mutations.addFriend(supabase, requireUser(), friendId, message)
       if (connection) {
-        setState((prev) => ({ ...prev, friends: [...prev.friends, connection] }))
+        setState((current) => mergeFriends(current, connection))
       }
     },
     [requireUser]
@@ -686,9 +712,16 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     async (friendId: string) => {
       const supabase = createClient()
       await mutations.unfriend(supabase, friendId)
-      await refresh()
+      setState((current) => {
+        const connection = current.friends.find(
+          ({ userId, friendId: connectedId }) =>
+            (userId === currentUserId && connectedId === friendId)
+            || (userId === friendId && connectedId === currentUserId),
+        )
+        return connection ? removeFriend(current, connection.id) : current
+      })
     },
-    [refresh]
+    [currentUserId]
   )
 
   const sendDirectMessage = useCallback(
@@ -702,10 +735,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const acceptFriend = useCallback(
     async (connectionId: string) => {
       const supabase = createClient()
-      await mutations.acceptFriend(supabase, connectionId)
-      await refresh()
+      const connection = await mutations.acceptFriend(supabase, connectionId)
+      setState((current) => mergeFriends(current, connection))
     },
-    [refresh]
+    []
   )
 
 
@@ -713,10 +746,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const declineFriend = useCallback(
     async (connectionId: string) => {
       const supabase = createClient()
-      await mutations.declineFriend(supabase, connectionId)
-      await refresh()
+      const connection = await mutations.declineFriend(supabase, connectionId)
+      setState((current) => removeFriend(current, connection.id))
     },
-    [refresh]
+    []
   )
 
   const value = useMemo<HuddleContextValue>(

@@ -15,7 +15,11 @@ import {
   SAFETY_REPORT_COLUMNS,
 } from "@/lib/supabase/query-contracts"
 
-const sourceFiles = ["lib/notifications/api.ts", "lib/supabase/queries.ts"]
+const sourceFiles = [
+  "lib/notifications/api.ts",
+  "lib/supabase/queries.ts",
+  "lib/supabase/mutations.ts",
+]
 
 describe("Supabase query contracts", () => {
   it("defines the exact six core datasets", () => {
