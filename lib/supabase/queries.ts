@@ -2,10 +2,19 @@ import type { PostgrestError } from "@supabase/supabase-js"
 import type { HuddleBrowserClient } from "@/lib/supabase/client"
 import {
   ACTIVITY_COLUMNS,
+  CHAT_MESSAGE_COLUMNS,
+  CHAT_PAGE_SIZE,
+  CHAT_PREVIEW_ACTIVITY_LIMIT,
+  CHAT_PREVIEW_MESSAGE_LIMIT,
   FRIEND_CONNECTION_COLUMNS,
   LOCATION_COLUMNS,
   PROFILE_COLUMNS,
+  PULSE_RESPONSE_COLUMNS,
   RSVP_COLUMNS,
+  SAFETY_FLAG_COLUMNS,
+  SAFETY_QUEUE_LIMIT,
+  SAFETY_REPORT_COLUMNS,
+  type MessageCursor,
 } from "@/lib/supabase/query-contracts"
 import {
   toChatMessage,
@@ -14,7 +23,6 @@ import {
   toHuddleLocation,
   toHuddleProfile,
   toHuddleRsvp,
-  toPulse,
   toPulseResponseView,
   toSafetyFlag,
   toSafetyReport,
@@ -22,9 +30,12 @@ import {
 import type {
   ActivityRow,
   FriendConnectionRow,
+  MessageRow,
   Profile,
   PublicProfile,
   RsvpRow,
+  SafetyFlagRow,
+  SafetyReportRow,
 } from "@/lib/types/database"
 import type {
   ChatMessage,
@@ -187,18 +198,131 @@ export async function fetchCoreHuddleSnapshot(
   }
 }
 
-export async function fetchActivityMessages(
+export interface MessagePage {
+  items: ChatMessage[]
+  nextCursor: MessageCursor | null
+}
+
+export async function fetchActivityMessagePage(
   supabase: HuddleBrowserClient,
-  activityId: string
+  activityId: string,
+  cursor: MessageCursor | null = null,
+  pageSize = CHAT_PAGE_SIZE,
+): Promise<MessagePage> {
+  if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > CHAT_PAGE_SIZE) {
+    throw new RangeError(`Message page size must be between 1 and ${CHAT_PAGE_SIZE}`)
+  }
+
+  let query = supabase
+    .from("messages")
+    .select(CHAT_MESSAGE_COLUMNS)
+    .eq("activity_id", activityId)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(pageSize + 1)
+
+  if (cursor) {
+    query = query.or(
+      `created_at.lt.${cursor.createdAt},and(created_at.eq.${cursor.createdAt},id.lt.${cursor.id})`,
+    )
+  }
+
+  const { data, error } = await query
+  throwOnError(error, "Could not load messages")
+  const rows = (data ?? []) as MessageRow[]
+  const hasMore = rows.length > pageSize
+  const visible = rows.slice(0, pageSize)
+  const oldest = visible.at(-1)
+  return {
+    items: visible.map(toChatMessage).reverse(),
+    nextCursor: hasMore && oldest
+      ? { createdAt: oldest.created_at, id: oldest.id }
+      : null,
+  }
+}
+
+export async function fetchChatPreviews(
+  supabase: HuddleBrowserClient,
+  activityIds: string[],
 ): Promise<ChatMessage[]> {
+  const ids = [...new Set(activityIds)].slice(0, CHAT_PREVIEW_ACTIVITY_LIMIT)
+  if (ids.length === 0) return []
+
   const { data, error } = await supabase
     .from("messages")
-    .select("*")
-    .eq("activity_id", activityId)
-    .order("created_at")
+    .select(CHAT_MESSAGE_COLUMNS)
+    .in("activity_id", ids)
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(CHAT_PREVIEW_MESSAGE_LIMIT)
 
-  throwOnError(error, "Could not load messages")
+  throwOnError(error, "Could not load chat previews")
   return (data ?? []).map(toChatMessage)
+}
+
+export interface SafetyReviewQueue {
+  pendingActivities: HuddleActivity[]
+  flags: SafetyFlag[]
+  reports: SafetyReport[]
+}
+
+export async function fetchSafetyReviewQueue(
+  supabase: HuddleBrowserClient,
+): Promise<SafetyReviewQueue> {
+  const [activities, flags, reports] = await Promise.all([
+    supabase
+      .from("activities")
+      .select(ACTIVITY_COLUMNS)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(SAFETY_QUEUE_LIMIT),
+    supabase
+      .from("safety_flags")
+      .select(SAFETY_FLAG_COLUMNS)
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(SAFETY_QUEUE_LIMIT),
+    supabase
+      .from("safety_reports")
+      .select(SAFETY_REPORT_COLUMNS)
+      .eq("status", "open")
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(SAFETY_QUEUE_LIMIT),
+  ])
+
+  throwOnError(activities.error, "Could not load pending activities")
+  throwOnError(flags.error, "Could not load safety flags")
+  throwOnError(reports.error, "Could not load safety reports")
+  return {
+    pendingActivities: ((activities.data ?? []) as ActivityRow[]).map(toHuddleActivity),
+    flags: ((flags.data ?? []) as SafetyFlagRow[]).map(toSafetyFlag),
+    reports: ((reports.data ?? []) as SafetyReportRow[]).map(toSafetyReport),
+  }
+}
+
+export async function fetchActivityById(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+): Promise<HuddleActivity | null> {
+  const { data, error } = await supabase
+    .from("activities")
+    .select(ACTIVITY_COLUMNS)
+    .eq("id", activityId)
+    .maybeSingle()
+
+  throwOnError(error, "Could not load activity")
+  return data ? toHuddleActivity(data) : null
+}
+
+export async function fetchProfileById(
+  supabase: HuddleBrowserClient,
+  userId: string,
+): Promise<HuddleProfile | null> {
+  const row = await fetchProfileRowById(supabase, userId)
+  return row ? toHuddleProfile(row) : null
 }
 
 export async function fetchMessageById(
@@ -207,7 +331,7 @@ export async function fetchMessageById(
 ): Promise<ChatMessage | null> {
   const { data, error } = await supabase
     .from("messages")
-    .select("*")
+    .select(CHAT_MESSAGE_COLUMNS)
     .eq("id", messageId)
     .maybeSingle()
 
@@ -222,7 +346,7 @@ export async function fetchOwnPulseResponse(
 ): Promise<PulseResponseView | null> {
   const { data, error } = await supabase
     .from("pulses")
-    .select("*")
+    .select(PULSE_RESPONSE_COLUMNS)
     .eq("activity_id", activityId)
     .eq("user_id", userId)
     .maybeSingle()

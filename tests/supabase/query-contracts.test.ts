@@ -15,7 +15,7 @@ import {
   SAFETY_REPORT_COLUMNS,
 } from "@/lib/supabase/query-contracts"
 
-const sourceFiles = ["lib/notifications/api.ts"]
+const sourceFiles = ["lib/notifications/api.ts", "lib/supabase/queries.ts"]
 
 describe("Supabase query contracts", () => {
   it("defines the exact six core datasets", () => {
@@ -50,7 +50,7 @@ describe("Supabase query contracts", () => {
     expect(LOCATION_COLUMNS.split(",")).toContain("created_at")
   })
 
-  it("contains no wildcard select in the notification query changed here", () => {
+  it("contains no wildcard select in the optimized query layer", () => {
     for (const file of sourceFiles) {
       const source = readFileSync(resolve(process.cwd(), file), "utf8")
       expect(source, file).not.toMatch(/\.select\(["']\*["']\)/u)

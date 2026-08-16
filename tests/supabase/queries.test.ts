@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest"
-import { CORE_TABLES } from "@/lib/supabase/query-contracts"
-import { fetchCoreHuddleSnapshot } from "@/lib/supabase/queries"
+import {
+  CHAT_MESSAGE_COLUMNS,
+  CHAT_PAGE_SIZE,
+  CHAT_PREVIEW_MESSAGE_LIMIT,
+  CORE_TABLES,
+  PROFILE_COLUMNS,
+  SAFETY_QUEUE_LIMIT,
+} from "@/lib/supabase/query-contracts"
+import {
+  fetchActivityById,
+  fetchActivityMessagePage,
+  fetchChatPreviews,
+  fetchCoreHuddleSnapshot,
+  fetchProfileById,
+  fetchSafetyReviewQueue,
+} from "@/lib/supabase/queries"
 import type { HuddleBrowserClient } from "@/lib/supabase/client"
 import type {
   ActivityRow,
@@ -9,6 +23,8 @@ import type {
   MessageRow,
   PublicProfile,
   RsvpRow,
+  SafetyFlagRow,
+  SafetyReportRow,
 } from "@/lib/types/database"
 
 interface RecordedCall {
@@ -124,6 +140,32 @@ export function messageRow(overrides: Partial<MessageRow> = {}): MessageRow {
     is_system: false,
     body: "See you there",
     flagged: false,
+    created_at: "2026-08-16T11:00:00.000Z",
+    ...overrides,
+  }
+}
+
+function safetyFlagRow(overrides: Partial<SafetyFlagRow> = {}): SafetyFlagRow {
+  return {
+    id: "flag-1",
+    type: "chat",
+    ref_id: "message-1",
+    reason: "Needs review",
+    status: "open",
+    reviewer: null,
+    created_at: "2026-08-16T11:00:00.000Z",
+    resolved_at: null,
+    ...overrides,
+  }
+}
+
+function safetyReportRow(overrides: Partial<SafetyReportRow> = {}): SafetyReportRow {
+  return {
+    id: "report-1",
+    reporter_id: "user-1",
+    reported_user_id: "user-2",
+    context: "Please review this interaction",
+    status: "open",
     created_at: "2026-08-16T11:00:00.000Z",
     ...overrides,
   }
@@ -299,5 +341,91 @@ describe("fetchCoreHuddleSnapshot", () => {
       "safety_reports",
       "pulses",
     ]))
+  })
+})
+
+describe("feature-owned Supabase loaders", () => {
+  it("paginates one chat thread by created_at and id", async () => {
+    const { client, calls } = recordingClient({ messages: [messageRow()] })
+    const page = await fetchActivityMessagePage(client, "activity-1", {
+      createdAt: "2026-08-16T12:00:00.000Z",
+      id: "message-9",
+    })
+
+    const call = findCall(calls, "messages")
+    expect(call.select).toBe(CHAT_MESSAGE_COLUMNS)
+    expect(call.filters).toEqual(expect.arrayContaining([
+      ["eq", "activity_id", "activity-1"],
+      [
+        "or",
+        "created_at.lt.2026-08-16T12:00:00.000Z,and(created_at.eq.2026-08-16T12:00:00.000Z,id.lt.message-9)",
+        null,
+      ],
+    ]))
+    expect(call.orders).toEqual([["created_at", false], ["id", false]])
+    expect(call.limit).toBe(CHAT_PAGE_SIZE + 1)
+    expect(page.items).toHaveLength(1)
+  })
+
+  it("bounds chat previews to visible unique chat activities", async () => {
+    const { client, calls } = recordingClient({ messages: [messageRow()] })
+    await fetchChatPreviews(client, ["activity-1", "activity-1", "activity-2"])
+
+    const call = findCall(calls, "messages")
+    expect(call.select).toBe(CHAT_MESSAGE_COLUMNS)
+    expect(call.filters).toContainEqual([
+      "in",
+      "activity_id",
+      ["activity-1", "activity-2"],
+    ])
+    expect(call.limit).toBe(CHAT_PREVIEW_MESSAGE_LIMIT)
+  })
+
+  it("loads only open bounded moderation rows", async () => {
+    const { client, calls } = recordingClient({
+      activities: [activityRow({ status: "pending" })],
+      safety_flags: [safetyFlagRow()],
+      safety_reports: [safetyReportRow()],
+    })
+    const queue = await fetchSafetyReviewQueue(client)
+
+    expect(calls.map(({ table }) => table)).toEqual([
+      "activities",
+      "safety_flags",
+      "safety_reports",
+    ])
+    expect(findCall(calls, "activities").filters)
+      .toContainEqual(["eq", "status", "pending"])
+    expect(findCall(calls, "safety_flags").filters)
+      .toContainEqual(["eq", "status", "open"])
+    expect(findCall(calls, "safety_reports").filters)
+      .toContainEqual(["eq", "status", "open"])
+    for (const call of calls) expect(call.limit).toBe(SAFETY_QUEUE_LIMIT)
+    expect(queue).toMatchObject({
+      pendingActivities: [{ id: "activity-1" }],
+      flags: [{ id: "flag-1" }],
+      reports: [{ id: "report-1" }],
+    })
+  })
+
+  it("loads an out-of-window activity without expanding core", async () => {
+    const { client, calls } = recordingClient({ activities: [activityRow()] })
+    const activity = await fetchActivityById(client, "activity-1")
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].filters).toContainEqual(["eq", "id", "activity-1"])
+    expect(activity?.id).toBe("activity-1")
+  })
+
+  it("loads a mapped public profile with the protected projection", async () => {
+    const { client, calls } = recordingClient({ profiles: [profileRow()] })
+    const profile = await fetchProfileById(client, "user-1")
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0].select).toBe(PROFILE_COLUMNS)
+    expect(calls[0].filters).toContainEqual(["eq", "id", "user-1"])
+    expect(profile).toMatchObject({ userId: "user-1", displayName: "Ada L." })
+    expect(profile).not.toHaveProperty("email")
+    expect(profile?.gender).toBeUndefined()
   })
 })
