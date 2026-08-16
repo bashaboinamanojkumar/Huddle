@@ -14,7 +14,7 @@ import { scoreFit } from "@/lib/scoring/score-fit"
 import { createClient } from "@/lib/supabase/client"
 import { toChatMessage } from "@/lib/supabase/mappers"
 import * as mutations from "@/lib/supabase/mutations"
-import { ensureProfile, fetchHuddleSnapshot } from "@/lib/supabase/queries"
+import { fetchCoreHuddleSnapshot } from "@/lib/supabase/queries"
 import {
   createSingleFlight,
   isRefreshScopeCurrent,
@@ -220,6 +220,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const sessionUserId = state.session?.userId ?? null
   const loadedFor = useRef<string | null>(null)
+  const loadedUniversity = useRef<UniversityId>(DEFAULT_UNIVERSITY_ID)
   const sessionGeneration = useRef(0)
   const refreshFlight = useRef<SingleFlight<void> | null>(null)
   if (!refreshFlight.current) {
@@ -232,19 +233,24 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     const generation = ++sessionGeneration.current
     const supabase = createClient()
     const email = normalizeCampusEmail(identity.email) ?? identity.email
+    const universityId = universityFor(email)
 
-    await ensureProfile(supabase)
-    const snapshot = await fetchHuddleSnapshot(supabase, identity.id)
+    const snapshot = await fetchCoreHuddleSnapshot(
+      supabase,
+      identity.id,
+      universityId,
+    )
 
     if (sessionGeneration.current === generation) {
       loadedFor.current = identity.id
+      loadedUniversity.current = universityId
       setState({
         ...snapshot,
         session: {
           userId: identity.id,
           email,
           expiresAt: addDays(new Date(), SESSION_DAYS),
-          universityId: universityFor(email),
+          universityId,
         },
       })
     }
@@ -267,7 +273,11 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       }
 
       const supabase = createClient()
-      const snapshot = await fetchHuddleSnapshot(supabase, userId)
+      const snapshot = await fetchCoreHuddleSnapshot(
+        supabase,
+        userId,
+        loadedUniversity.current,
+      )
       if (!isRefreshScopeCurrent(
         requestScope,
         loadedFor.current,
@@ -275,7 +285,15 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       )) {
         return
       }
-      setState((prev) => ({ ...snapshot, session: prev.session }))
+      setState((previous) => ({
+        ...previous,
+        profiles: snapshot.profiles,
+        locations: snapshot.locations,
+        activities: snapshot.activities,
+        rsvps: snapshot.rsvps,
+        friends: snapshot.friends,
+        session: previous.session,
+      }))
     })
   }, [])
 
@@ -387,6 +405,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     refreshFlight.current?.reset()
     sessionGeneration.current += 1
     loadedFor.current = null
+    loadedUniversity.current = DEFAULT_UNIVERSITY_ID
     setState(EMPTY_STATE)
   }, [])
 

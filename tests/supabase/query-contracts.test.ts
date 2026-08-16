@@ -47,6 +47,7 @@ describe("Supabase query contracts", () => {
 
     expect(PROFILE_COLUMNS.split(",").map((column) => column.trim()))
       .not.toContain("email")
+    expect(LOCATION_COLUMNS.split(",")).toContain("created_at")
   })
 
   it("contains no wildcard select in the notification query changed here", () => {

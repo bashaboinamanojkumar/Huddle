@@ -1,6 +1,12 @@
 import type { PostgrestError } from "@supabase/supabase-js"
 import type { HuddleBrowserClient } from "@/lib/supabase/client"
-import { PROFILE_COLUMNS } from "@/lib/supabase/query-contracts"
+import {
+  ACTIVITY_COLUMNS,
+  FRIEND_CONNECTION_COLUMNS,
+  LOCATION_COLUMNS,
+  PROFILE_COLUMNS,
+  RSVP_COLUMNS,
+} from "@/lib/supabase/query-contracts"
 import {
   toChatMessage,
   toFriendConnection,
@@ -13,7 +19,13 @@ import {
   toSafetyFlag,
   toSafetyReport,
 } from "@/lib/supabase/mappers"
-import type { Profile, PublicProfile } from "@/lib/types/database"
+import type {
+  ActivityRow,
+  FriendConnectionRow,
+  Profile,
+  PublicProfile,
+  RsvpRow,
+} from "@/lib/types/database"
 import type {
   ChatMessage,
   FriendConnection,
@@ -26,6 +38,7 @@ import type {
   PulseResponseView,
   SafetyFlag,
   SafetyReport,
+  UniversityId,
 } from "@/lib/types/huddle"
 
 export interface HuddleSnapshot {
@@ -77,59 +90,100 @@ export async function fetchOwnGender(
   return data?.gender ?? undefined
 }
 
-export async function fetchHuddleSnapshot(
+async function fetchProfileRowById(
   supabase: HuddleBrowserClient,
-  userId: string
+  userId: string,
+): Promise<PublicProfile | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .eq("id", userId)
+    .maybeSingle()
+
+  throwOnError(error, "Could not load your profile")
+  return data as unknown as PublicProfile | null
+}
+
+export async function fetchCoreHuddleSnapshot(
+  supabase: HuddleBrowserClient,
+  userId: string,
+  universityId: UniversityId,
+  now = new Date(),
 ): Promise<HuddleSnapshot> {
-  const [
-    profiles,
-    locations,
-    activities,
-    rsvps,
-    messages,
-    flags,
-    reports,
-    pulses,
-    friends,
-    gender,
-  ] = await Promise.all([
-    supabase.from("profiles").select(PROFILE_COLUMNS),
-    supabase.from("locations").select("*").order("name"),
-    supabase.from("activities").select("*").order("start_time"),
-    supabase.from("rsvps").select("*"),
-    supabase.from("messages").select("*").order("created_at"),
-    supabase.from("safety_flags").select("*").order("created_at", { ascending: false }),
-    supabase.from("safety_reports").select("*").order("created_at", { ascending: false }),
-    supabase.from("pulses").select("*"),
-    supabase.from("friend_connections").select("*"),
+  const [locations, activities, friends, gender] = await Promise.all([
+    supabase
+      .from("locations")
+      .select(LOCATION_COLUMNS)
+      .eq("university_id", universityId)
+      .order("name"),
+    supabase
+      .from("activities")
+      .select(ACTIVITY_COLUMNS)
+      .eq("university_id", universityId)
+      .eq("status", "approved")
+      .gte("start_time", now.toISOString())
+      .order("start_time")
+      .order("id"),
+    supabase
+      .from("friend_connections")
+      .select(FRIEND_CONNECTION_COLUMNS)
+      .or(`user_id.eq.${userId},friend_id.eq.${userId}`),
     fetchOwnGender(supabase, userId),
   ])
 
-  throwOnError(profiles.error, "Could not load profiles")
   throwOnError(locations.error, "Could not load meet-points")
   throwOnError(activities.error, "Could not load activities")
-  throwOnError(rsvps.error, "Could not load RSVPs")
-  throwOnError(messages.error, "Could not load messages")
-  throwOnError(flags.error, "Could not load safety flags")
-  throwOnError(reports.error, "Could not load safety reports")
-  throwOnError(pulses.error, "Could not load pulses")
   throwOnError(friends.error, "Could not load connections")
 
-  const profileRows = (profiles.data ?? []) as unknown as PublicProfile[]
+  const activityRows = (activities.data ?? []) as unknown as ActivityRow[]
+  const friendRows = (friends.data ?? []) as unknown as FriendConnectionRow[]
+  const relatedProfileIds = new Set([userId])
+  for (const row of friendRows) {
+    relatedProfileIds.add(row.user_id)
+    relatedProfileIds.add(row.friend_id)
+  }
+
+  const profileFilter = [
+    `university_id.eq.${universityId}`,
+    `id.in.(${[...relatedProfileIds].join(",")})`,
+  ].join(",")
+  const profileQuery = supabase
+    .from("profiles")
+    .select(PROFILE_COLUMNS)
+    .or(profileFilter)
+  const rsvpQuery = activityRows.length === 0
+    ? Promise.resolve({ data: [] as RsvpRow[], error: null })
+    : supabase
+        .from("rsvps")
+        .select(RSVP_COLUMNS)
+        .in("activity_id", activityRows.map(({ id }) => id))
+
+  const [profiles, rsvps] = await Promise.all([profileQuery, rsvpQuery])
+  throwOnError(profiles.error, "Could not load profiles")
+  throwOnError(rsvps.error, "Could not load RSVPs")
+
+  let profileRows = (profiles.data ?? []) as unknown as PublicProfile[]
+  if (!profileRows.some(({ id }) => id === userId)) {
+    await ensureProfile(supabase)
+    const ownProfile = await fetchProfileRowById(supabase, userId)
+    if (!ownProfile) {
+      throw new Error("Could not load your profile")
+    }
+    profileRows = [...profileRows, ownProfile]
+  }
 
   return {
-    // Gender is private to its owner, so it is only ever attached to the viewer's own row.
     profiles: profileRows.map((row) =>
       toHuddleProfile(row, row.id === userId ? gender : undefined)
     ),
     locations: (locations.data ?? []).map(toHuddleLocation),
-    activities: (activities.data ?? []).map(toHuddleActivity),
+    activities: activityRows.map(toHuddleActivity),
     rsvps: (rsvps.data ?? []).map(toHuddleRsvp),
-    messages: (messages.data ?? []).map(toChatMessage),
-    flags: (flags.data ?? []).map(toSafetyFlag),
-    reports: (reports.data ?? []).map(toSafetyReport),
-    pulses: (pulses.data ?? []).map(toPulse),
-    friends: (friends.data ?? []).map(toFriendConnection),
+    messages: [],
+    flags: [],
+    reports: [],
+    pulses: [],
+    friends: friendRows.map(toFriendConnection),
   }
 }
 
