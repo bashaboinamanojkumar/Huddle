@@ -98,6 +98,12 @@ dead link. A `token_hash` carries no such dependency and verifies from any devic
 `{{ .RedirectTo }}` is the origin the browser sent, with no trailing slash, so the rendered link
 becomes `https://myhuddle.vercel.app/auth/confirm?token_hash=...`. Do not add a slash after it.
 
+For the customized `token_hash` links above, `/auth/confirm` does not spend the one-time token
+during the first `GET`. It stores the token in a short-lived, HTTP-only cookie and redirects to a
+review screen where the student must press a button. The resulting `POST` performs `verifyOtp`.
+This protects campus users from Microsoft Defender Safe Links and other email scanners that
+prefetch links before the student opens them.
+
 If a template is left unedited, the confirmation still succeeds — Supabase verifies the token on
 its own domain first — but the student lands on the home page instead of being signed in, and has
 to sign in by hand afterwards. Recovery links will not reach the password form at all.
@@ -123,7 +129,8 @@ Run this against the deployed origin after the settings above are saved.
 3. Create an account with an eligible campus address. Confirm the "check your inbox" panel appears
    and no session is created.
 4. Open the confirmation email **on a different device**. Confirm the link host is your own origin
-   with the path `/auth/confirm`, and that following it lands on `/onboarding`.
+   with the path `/auth/confirm`, that it opens the "Confirm your email" review screen, and that
+   pressing **Confirm email and create account** lands on `/onboarding`.
 5. Sign out, then sign in with the same address and password. Confirm it lands on `/app`.
 6. Sign in with a deliberately wrong password and confirm the message is
    "That email and password combination is incorrect."
@@ -144,6 +151,5 @@ Run this against the deployed origin after the settings above are saved.
   design. Closing it would mean adding a domain check to `handle_new_user`, which is a database
   migration rather than an application change.
 - Supabase's own rate limits are the only brute-force protection on the sign-in form.
-- Microsoft 365 Safe Links and similar scanners can consume a one-time email token before the
-  student clicks it. If campus mail starts doing this, the fix is an interstitial page that
-  requires a click before calling `verifyOtp`.
+- The confirmation cookie expires after 10 minutes. If a student leaves the review screen open
+  longer than that, they must reopen the email link or request a new one.
