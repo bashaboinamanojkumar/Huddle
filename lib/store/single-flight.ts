@@ -3,6 +3,11 @@ export interface SingleFlight<T> {
   reset(): void
 }
 
+export interface FeatureFlights<T = unknown> {
+  run<TResult extends T>(key: string, operation: () => Promise<TResult>): Promise<TResult>
+  reset(): void
+}
+
 export interface RefreshScope {
   userId: string
   generation: number
@@ -37,6 +42,27 @@ export function createSingleFlight<T>(): SingleFlight<T> {
     },
     reset() {
       current = undefined
+    },
+  }
+}
+
+export function createFeatureFlights<T = unknown>(): FeatureFlights<T> {
+  const flights = new Map<string, SingleFlight<unknown>>()
+
+  return {
+    run<TResult extends T>(key: string, operation: () => Promise<TResult>) {
+      let flight = flights.get(key)
+      if (!flight) {
+        flight = createSingleFlight<unknown>()
+        flights.set(key, flight)
+      }
+      return flight.run(operation) as Promise<TResult>
+    },
+    reset() {
+      for (const flight of flights.values()) {
+        flight.reset()
+      }
+      flights.clear()
     },
   }
 }

@@ -161,7 +161,7 @@ export function PulsePageView({
 
 export default function PulseResponsePage() {
   const params = useParams<{ id: string }>()
-  const { activities, currentUserId, hydrated } = useHuddle()
+  const { activities, currentUserId, hydrated, loadActivity } = useHuddle()
   const activity = activities.find((item) => item.id === params.id)
   const eligible = activity?.userRsvp?.status === "going"
   const [status, setStatus] = useState<PulsePageStatus>("loading")
@@ -171,13 +171,34 @@ export default function PulseResponsePage() {
   const [loadVersion, setLoadVersion] = useState(0)
 
   useEffect(() => {
+    if (!hydrated || activity) return
+
+    let active = true
+    setStatus("loading")
+    void loadActivity(params.id)
+      .then((loaded) => {
+        if (active && !loaded) setStatus("ineligible")
+      })
+      .catch(() => {
+        if (active) setStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [activity, hydrated, loadActivity, loadVersion, params.id])
+
+  useEffect(() => {
     let active = true
 
     if (!hydrated) {
       setStatus("loading")
       return () => { active = false }
     }
-    if (!activity || !eligible) {
+    if (!activity) {
+      setStatus("loading")
+      return () => { active = false }
+    }
+    if (!eligible) {
       setStatus("ineligible")
       return () => { active = false }
     }
