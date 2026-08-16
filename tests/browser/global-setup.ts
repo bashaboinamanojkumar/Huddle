@@ -158,6 +158,12 @@ export default async function globalSetup(): Promise<void> {
       'Browser message flag', 'open'
     );
 
+    -- The fixture rows above intentionally run the real notification producers.
+    -- Reset only this new test user's inbox before installing the two-row baseline
+    -- owned by notifications.spec.ts.
+    delete from public.notifications
+    where user_id = '${userId}';
+
     insert into public.notifications (
       id, user_id, type, category, title, body, url, data, dedupe_key,
       created_at, last_event_at
