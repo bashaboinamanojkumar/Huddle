@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import {
+  createFeatureFlights,
   createSingleFlight,
   isRefreshScopeCurrent,
 } from "@/lib/store/single-flight"
@@ -52,5 +53,39 @@ describe("createSingleFlight", () => {
     expect(isRefreshScopeCurrent(request, null, 5)).toBe(false)
     expect(isRefreshScopeCurrent(request, "student-2", 5)).toBe(false)
     expect(isRefreshScopeCurrent(request, "student-1", 5)).toBe(false)
+  })
+})
+
+describe("createFeatureFlights", () => {
+  it("shares concurrent loads per feature key and retries after failure", async () => {
+    const flights = createFeatureFlights<string>()
+    const operation = vi.fn(async () => "loaded")
+    const first = flights.run("chat:activity-1", operation)
+    const second = flights.run("chat:activity-1", operation)
+
+    await expect(Promise.all([first, second])).resolves.toEqual(["loaded", "loaded"])
+    expect(operation).toHaveBeenCalledTimes(1)
+
+    await expect(flights.run("safety", async () => {
+      throw new Error("offline")
+    })).rejects.toThrow("offline")
+    await expect(flights.run("safety", async () => "retry")).resolves.toBe("retry")
+  })
+
+  it("detaches every in-flight key when reset", async () => {
+    const flights = createFeatureFlights<string>()
+    let resolveFirst: ((value: string) => void) | undefined
+    const first = flights.run("profile:user-1", () => new Promise<string>((resolve) => {
+      resolveFirst = resolve
+    }))
+
+    flights.reset()
+    const secondOperation = vi.fn(async () => "new-session")
+    await expect(flights.run("profile:user-1", secondOperation))
+      .resolves.toBe("new-session")
+    expect(secondOperation).toHaveBeenCalledOnce()
+
+    resolveFirst?.("old-session")
+    await expect(first).resolves.toBe("old-session")
   })
 })

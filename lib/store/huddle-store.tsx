@@ -14,12 +14,34 @@ import { scoreFit } from "@/lib/scoring/score-fit"
 import { createClient } from "@/lib/supabase/client"
 import { toChatMessage } from "@/lib/supabase/mappers"
 import * as mutations from "@/lib/supabase/mutations"
-import { ensureProfile, fetchHuddleSnapshot } from "@/lib/supabase/queries"
 import {
+  fetchActivityById,
+  fetchActivityMessagePage,
+  fetchActivityRsvpByUser,
+  fetchChatPreviews,
+  fetchCoreHuddleSnapshot,
+  fetchProfileById,
+  fetchSafetyReviewQueue,
+} from "@/lib/supabase/queries"
+import type { MessageCursor } from "@/lib/supabase/query-contracts"
+import {
+  createFeatureFlights,
   createSingleFlight,
   isRefreshScopeCurrent,
+  type FeatureFlights,
   type SingleFlight,
 } from "@/lib/store/single-flight"
+import {
+  mergeActivities,
+  mergeFlags,
+  mergeFriends,
+  mergeMessages,
+  mergeProfiles,
+  mergeReports,
+  mergeRsvp,
+  removeFriend,
+  removeRsvp,
+} from "@/lib/store/huddle-state"
 import type { MessageRow } from "@/lib/types/database"
 import type {
   ActivityView,
@@ -113,6 +135,10 @@ export interface CreateActivityInput {
   safetyPreference: SafetyPreference
 }
 
+interface FeatureLoadResult {
+  status: "ready"
+}
+
 interface HuddleContextValue {
   state: HuddleState
   hydrated: boolean
@@ -124,6 +150,14 @@ interface HuddleContextValue {
   chatActivities: ActivityView[]
   pendingActivities: HuddleActivity[]
   refresh: () => Promise<void>
+  loadChatPreviews: (activityIds: string[]) => Promise<FeatureLoadResult>
+  loadActivityMessages: (
+    activityId: string,
+    cursor?: MessageCursor | null,
+  ) => Promise<MessageCursor | null>
+  loadSafetyReview: () => Promise<FeatureLoadResult>
+  loadActivity: (activityId: string) => Promise<HuddleActivity | null>
+  loadProfile: (profileId: string) => Promise<HuddleProfile | null>
   bridgeAuthenticatedUser: (
     identity: AuthenticatedIdentity,
     requestedPath?: string | null
@@ -220,31 +254,42 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const sessionUserId = state.session?.userId ?? null
   const loadedFor = useRef<string | null>(null)
+  const loadedUniversity = useRef<UniversityId>(DEFAULT_UNIVERSITY_ID)
   const sessionGeneration = useRef(0)
   const refreshFlight = useRef<SingleFlight<void> | null>(null)
+  const featureFlights = useRef<FeatureFlights | null>(null)
   if (!refreshFlight.current) {
     refreshFlight.current = createSingleFlight<void>()
+  }
+  if (!featureFlights.current) {
+    featureFlights.current = createFeatureFlights()
   }
 
   const load = useCallback(async (identity: AuthenticatedIdentity) => {
     refreshFlight.current?.reset()
+    featureFlights.current?.reset()
     loadedFor.current = null
     const generation = ++sessionGeneration.current
     const supabase = createClient()
     const email = normalizeCampusEmail(identity.email) ?? identity.email
+    const universityId = universityFor(email)
 
-    await ensureProfile(supabase)
-    const snapshot = await fetchHuddleSnapshot(supabase, identity.id)
+    const snapshot = await fetchCoreHuddleSnapshot(
+      supabase,
+      identity.id,
+      universityId,
+    )
 
     if (sessionGeneration.current === generation) {
       loadedFor.current = identity.id
+      loadedUniversity.current = universityId
       setState({
         ...snapshot,
         session: {
           userId: identity.id,
           email,
           expiresAt: addDays(new Date(), SESSION_DAYS),
-          universityId: universityFor(email),
+          universityId,
         },
       })
     }
@@ -267,7 +312,11 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       }
 
       const supabase = createClient()
-      const snapshot = await fetchHuddleSnapshot(supabase, userId)
+      const snapshot = await fetchCoreHuddleSnapshot(
+        supabase,
+        userId,
+        loadedUniversity.current,
+      )
       if (!isRefreshScopeCurrent(
         requestScope,
         loadedFor.current,
@@ -275,7 +324,139 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       )) {
         return
       }
-      setState((prev) => ({ ...snapshot, session: prev.session }))
+      setState((previous) => ({
+        ...previous,
+        profiles: snapshot.profiles,
+        locations: snapshot.locations,
+        activities: snapshot.activities,
+        rsvps: snapshot.rsvps,
+        friends: snapshot.friends,
+        session: previous.session,
+      }))
+    })
+  }, [])
+
+  const loadChatPreviews = useCallback(async (
+    activityIds: string[],
+  ): Promise<FeatureLoadResult> => {
+    const ids = [...new Set(activityIds)]
+    const generation = sessionGeneration.current
+    return featureFlights.current!.run(
+      `chat-previews:${ids.join(",")}`,
+      async () => {
+        const messages = await fetchChatPreviews(createClient(), ids)
+        if (sessionGeneration.current === generation) {
+          const activityIdSet = new Set(ids)
+          setState((previous) => ({
+            ...previous,
+            messages: [
+              ...previous.messages.filter(
+                (message) => !activityIdSet.has(message.activityId),
+              ),
+              ...messages,
+            ],
+          }))
+        }
+        return { status: "ready" }
+      },
+    )
+  }, [])
+
+  const loadActivityMessages = useCallback(async (
+    activityId: string,
+    cursor: MessageCursor | null = null,
+  ): Promise<MessageCursor | null> => {
+    const generation = sessionGeneration.current
+    const cursorKey = cursor ? `${cursor.createdAt}:${cursor.id}` : "newest"
+    return featureFlights.current!.run(
+      `chat:${activityId}:${cursorKey}`,
+      async () => {
+        const page = await fetchActivityMessagePage(
+          createClient(),
+          activityId,
+          cursor,
+        )
+        if (sessionGeneration.current === generation) {
+          setState((previous) => {
+            const unrelated = previous.messages.filter(
+              (message) => message.activityId !== activityId,
+            )
+            const existing = cursor
+              ? previous.messages.filter((message) => message.activityId === activityId)
+              : []
+            const byId = new Map(
+              [...existing, ...page.items].map((message) => [message.id, message]),
+            )
+            const thread = [...byId.values()].sort((a, b) =>
+              a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)
+            )
+            return { ...previous, messages: [...unrelated, ...thread] }
+          })
+        }
+        return page.nextCursor
+      },
+    )
+  }, [])
+
+  const loadSafetyReview = useCallback(async (): Promise<FeatureLoadResult> => {
+    const generation = sessionGeneration.current
+    return featureFlights.current!.run("safety", async () => {
+      const queue = await fetchSafetyReviewQueue(createClient())
+      if (sessionGeneration.current === generation) {
+        setState((previous) => ({
+          ...previous,
+          activities: [
+            ...previous.activities.filter((activity) => activity.status !== "pending"),
+            ...queue.pendingActivities,
+          ],
+          flags: queue.flags,
+          reports: queue.reports,
+        }))
+      }
+      return { status: "ready" }
+    })
+  }, [])
+
+  const loadActivity = useCallback(async (
+    activityId: string,
+  ): Promise<HuddleActivity | null> => {
+    const generation = sessionGeneration.current
+    return featureFlights.current!.run(`activity:${activityId}`, async () => {
+      const supabase = createClient()
+      const userId = loadedFor.current
+      const [activity, rsvp] = await Promise.all([
+        fetchActivityById(supabase, activityId),
+        userId
+          ? fetchActivityRsvpByUser(supabase, activityId, userId)
+          : Promise.resolve(null),
+      ])
+      if (activity && sessionGeneration.current === generation) {
+        setState((previous) => {
+          const withActivity = mergeActivities(previous, activity)
+          return rsvp ? mergeRsvp(withActivity, rsvp) : withActivity
+        })
+      }
+      return activity
+    })
+  }, [])
+
+  const loadProfile = useCallback(async (
+    profileId: string,
+  ): Promise<HuddleProfile | null> => {
+    const generation = sessionGeneration.current
+    return featureFlights.current!.run(`profile:${profileId}`, async () => {
+      const profile = await fetchProfileById(createClient(), profileId)
+      if (profile && sessionGeneration.current === generation) {
+        setState((previous) => ({
+          ...previous,
+          profiles: previous.profiles.some(({ userId }) => userId === profile.userId)
+            ? previous.profiles.map((item) =>
+                item.userId === profile.userId ? profile : item
+              )
+            : [...previous.profiles, profile],
+        }))
+      }
+      return profile
     })
   }, [])
 
@@ -385,8 +566,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
 
   const clearLocalSession = useCallback(() => {
     refreshFlight.current?.reset()
+    featureFlights.current?.reset()
     sessionGeneration.current += 1
     loadedFor.current = null
+    loadedUniversity.current = DEFAULT_UNIVERSITY_ID
     setState(EMPTY_STATE)
   }, [])
 
@@ -400,40 +583,53 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const completeOnboarding = useCallback(
     async (input: OnboardingInput) => {
       const supabase = createClient()
-      await mutations.completeOnboarding(supabase, requireUser(), input)
-      await refresh()
+      const profile = await mutations.completeOnboarding(supabase, requireUser(), input)
+      setState((current) => mergeProfiles(current, profile))
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const updateProfile = useCallback(
     async (updates: Partial<HuddleProfile>) => {
       const supabase = createClient()
-      await mutations.updateProfile(supabase, requireUser(), updates)
-      await refresh()
+      const profile = await mutations.updateProfile(supabase, requireUser(), updates)
+      setState((current) => {
+        const existing = current.profiles.find(({ userId }) => userId === profile.userId)
+        const reconciled = profile.gender === undefined && existing?.gender !== undefined
+          ? { ...profile, gender: existing.gender }
+          : profile
+        return mergeProfiles(current, reconciled)
+      })
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const rsvpActivity = useCallback(
     async (activityId: string) => {
       const supabase = createClient()
-      requireUser()
+      const userId = requireUser()
       const outcome = await mutations.rsvpActivity(supabase, activityId)
-      await refresh()
+      if (outcome !== "full") {
+        setState((current) => mergeRsvp(current, {
+          activityId,
+          userId,
+          status: outcome,
+          timestamp: new Date().toISOString(),
+        }))
+      }
       return outcome
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const leaveActivity = useCallback(
     async (activityId: string) => {
       const supabase = createClient()
-      requireUser()
+      const userId = requireUser()
       await mutations.leaveActivity(supabase, activityId)
-      await refresh()
+      setState((current) => removeRsvp(current, activityId, userId))
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const createActivity = useCallback(
@@ -446,10 +642,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
         state.session?.universityId ?? "umd",
         input
       )
-      await refresh()
+      setState((current) => mergeActivities(current, activity))
       return activity
     },
-    [refresh, requireUser, state.session?.universityId]
+    [requireUser, state.session?.universityId]
   )
 
   const sendMessage = useCallback(
@@ -462,11 +658,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
         body
       )
 
-      setState((prev) =>
-        prev.messages.some((item) => item.id === message.id)
-          ? prev
-          : { ...prev, messages: [...prev.messages, message] }
-      )
+      setState((current) => mergeMessages(current, message))
 
       return message
     },
@@ -482,27 +674,33 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
         context,
         reportedUserId
       )
-      await refresh()
     },
-    [refresh, requireUser]
+    [requireUser]
   )
 
   const resolveFlag = useCallback(
     async (flagId: string, status: SafetyFlag["status"]) => {
       const supabase = createClient()
-      await mutations.resolveFlag(supabase, flagId, status)
-      await refresh()
+      const flag = await mutations.resolveFlag(supabase, flagId, status)
+      setState((current) => {
+        let next = mergeFlags(current, flag)
+        if (flag.type === "report") {
+          const report = current.reports.find(({ id }) => id === flag.refId)
+          if (report) next = mergeReports(next, { ...report, status: flag.status })
+        }
+        return next
+      })
     },
-    [refresh]
+    []
   )
 
   const reviewActivity = useCallback(
     async (activityId: string, status: "approved" | "rejected") => {
       const supabase = createClient()
-      await mutations.reviewActivity(supabase, activityId, status)
-      await refresh()
+      const activity = await mutations.reviewActivity(supabase, activityId, status)
+      setState((current) => mergeActivities(current, activity))
     },
-    [refresh]
+    []
   )
 
   const addFriend = useCallback(
@@ -510,7 +708,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       const supabase = createClient()
       const connection = await mutations.addFriend(supabase, requireUser(), friendId, message)
       if (connection) {
-        setState((prev) => ({ ...prev, friends: [...prev.friends, connection] }))
+        setState((current) => mergeFriends(current, connection))
       }
     },
     [requireUser]
@@ -519,10 +717,17 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const unfriend = useCallback(
     async (friendId: string) => {
       const supabase = createClient()
-      await mutations.unfriend(supabase, friendId)
-      await refresh()
+      await mutations.unfriend(supabase, requireUser(), friendId)
+      setState((current) => {
+        const connection = current.friends.find(
+          ({ userId, friendId: connectedId }) =>
+            (userId === currentUserId && connectedId === friendId)
+            || (userId === friendId && connectedId === currentUserId),
+        )
+        return connection ? removeFriend(current, connection.id) : current
+      })
     },
-    [refresh]
+    [currentUserId]
   )
 
   const sendDirectMessage = useCallback(
@@ -536,10 +741,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const acceptFriend = useCallback(
     async (connectionId: string) => {
       const supabase = createClient()
-      await mutations.acceptFriend(supabase, connectionId)
-      await refresh()
+      const connection = await mutations.acceptFriend(supabase, connectionId)
+      setState((current) => mergeFriends(current, connection))
     },
-    [refresh]
+    []
   )
 
 
@@ -547,10 +752,10 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
   const declineFriend = useCallback(
     async (connectionId: string) => {
       const supabase = createClient()
-      await mutations.declineFriend(supabase, connectionId)
-      await refresh()
+      const connection = await mutations.declineFriend(supabase, connectionId)
+      setState((current) => removeFriend(current, connection.id))
     },
-    [refresh]
+    []
   )
 
   const value = useMemo<HuddleContextValue>(
@@ -565,6 +770,11 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       chatActivities,
       pendingActivities,
       refresh,
+      loadChatPreviews,
+      loadActivityMessages,
+      loadSafetyReview,
+      loadActivity,
+      loadProfile,
       bridgeAuthenticatedUser,
       clearLocalSession,
       completeOnboarding,
@@ -593,6 +803,11 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
       chatActivities,
       pendingActivities,
       refresh,
+      loadChatPreviews,
+      loadActivityMessages,
+      loadSafetyReview,
+      loadActivity,
+      loadProfile,
       bridgeAuthenticatedUser,
       clearLocalSession,
       completeOnboarding,

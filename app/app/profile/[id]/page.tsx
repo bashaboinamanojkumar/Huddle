@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Award, CalendarHeart, GraduationCap, UserCheck, UserPlus } from "lucide-react"
@@ -33,9 +33,43 @@ const badges = [
 export default function StudentProfilePage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const { state, currentUserId, approvedActivities, addFriend, acceptFriend, declineFriend, unfriend, sendDirectMessage } = useHuddle()
+  const {
+    state,
+    currentUserId,
+    approvedActivities,
+    hydrated,
+    loadProfile,
+    addFriend,
+    acceptFriend,
+    declineFriend,
+    unfriend,
+    sendDirectMessage,
+  } = useHuddle()
 
   const profile = state.profiles.find((p) => p.userId === params.id)
+  const [loadStatus, setLoadStatus] = useState<"idle" | "loading" | "ready" | "not-found" | "error">("idle")
+  const [retryToken, setRetryToken] = useState(0)
+
+  useEffect(() => {
+    if (profile) {
+      setLoadStatus("ready")
+      return
+    }
+    if (!hydrated) return
+
+    let active = true
+    setLoadStatus("loading")
+    void loadProfile(params.id)
+      .then((loaded) => {
+        if (active) setLoadStatus(loaded ? "ready" : "not-found")
+      })
+      .catch(() => {
+        if (active) setLoadStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [hydrated, loadProfile, params.id, profile, retryToken])
 
   const friendConnection = useMemo(
     () => state.friends.find(
@@ -73,10 +107,29 @@ export default function StudentProfilePage() {
   )
 
   if (!profile) {
+    if (!hydrated || loadStatus === "idle" || loadStatus === "loading" || loadStatus === "ready") {
+      return (
+        <div className="flex min-h-full items-center justify-center px-5 text-sm text-white/58" role="status">
+          Loading profile…
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
-          <h1 className="font-heading text-xl font-bold text-white">Profile not found</h1>
+          <h1 className="font-heading text-xl font-bold text-white">
+            {loadStatus === "error" ? "Could not load profile" : "Profile not found"}
+          </h1>
+          {loadStatus === "error" && (
+            <button
+              type="button"
+              onClick={() => setRetryToken((value) => value + 1)}
+              className="mt-4 inline-flex rounded-2xl bg-white/10 px-5 py-3 text-sm font-bold text-white"
+            >
+              Retry profile
+            </button>
+          )}
           <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Back to feed
           </Link>

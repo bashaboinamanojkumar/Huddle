@@ -1,12 +1,35 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { MessageCircle, UsersRound } from "lucide-react"
 import { formatActivityDate, formatActivityTime } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
 
 export default function ChatsPage() {
-  const { chatActivities, state } = useHuddle()
+  const { chatActivities, state, loadChatPreviews } = useHuddle()
+  const [previewStatus, setPreviewStatus] = useState<"idle" | "loading" | "ready" | "error">("idle")
+  const [retryToken, setRetryToken] = useState(0)
+  const chatActivityKey = chatActivities.map(({ id }) => id).join(",")
+
+  useEffect(() => {
+    if (!chatActivityKey) {
+      setPreviewStatus("ready")
+      return
+    }
+    let active = true
+    setPreviewStatus("loading")
+    void loadChatPreviews(chatActivityKey.split(","))
+      .then(() => {
+        if (active) setPreviewStatus("ready")
+      })
+      .catch(() => {
+        if (active) setPreviewStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [chatActivityKey, loadChatPreviews, retryToken])
 
   return (
     <div className="ios-safe-pt min-h-full bg-background px-5 pb-5">
@@ -17,6 +40,24 @@ export default function ChatsPage() {
           Chats open automatically once an activity has at least two confirmed RSVPs.
         </p>
       </header>
+
+      {previewStatus === "loading" && chatActivities.length > 0 && (
+        <p className="mt-4 text-xs text-white/44" role="status">
+          Loading recent messages…
+        </p>
+      )}
+      {previewStatus === "error" && (
+        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-coral/10 px-4 py-3">
+          <p className="text-xs text-white/58">Recent messages could not be loaded.</p>
+          <button
+            type="button"
+            onClick={() => setRetryToken((value) => value + 1)}
+            className="shrink-0 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
+          >
+            Retry chat previews
+          </button>
+        </div>
+      )}
 
       <div className="mt-5 space-y-4">
         {chatActivities.map((activity) => {

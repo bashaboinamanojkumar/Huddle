@@ -1,4 +1,5 @@
 import type { HuddleBrowserClient } from "@/lib/supabase/client"
+import { NOTIFICATION_PREFERENCE_COLUMNS } from "@/lib/supabase/query-contracts"
 import { throwOnError } from "@/lib/supabase/queries"
 import type {
   NotificationPreferenceRow,
@@ -137,7 +138,7 @@ export async function fetchNotificationPreferences(
 ): Promise<NotificationPreferences> {
   const { data, error } = await supabase
     .from("notification_preferences")
-    .select("*")
+    .select(NOTIFICATION_PREFERENCE_COLUMNS)
     .eq("user_id", userId)
     .single()
   throwOnError(error, "Could not load notification settings")

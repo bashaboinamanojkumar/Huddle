@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Calendar, Flag, MapPin, MessageCircle, ShieldCheck, UsersRound } from "lucide-react"
@@ -13,15 +13,65 @@ import { RSVP_SUCCESS_EVENT } from "@/lib/notifications/push"
 export default function ActivityDetailPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const { activities, rsvpActivity, leaveActivity, reportSafetyConcern } = useHuddle()
+  const {
+    activities,
+    hydrated,
+    loadActivity,
+    rsvpActivity,
+    leaveActivity,
+    reportSafetyConcern,
+  } = useHuddle()
   const [pending, setPending] = useState(false)
+  const [showRipple, setShowRipple] = useState(false)
+  const [loadStatus, setLoadStatus] = useState<"idle" | "loading" | "ready" | "not-found" | "error">("idle")
+  const [retryToken, setRetryToken] = useState(0)
   const activity = activities.find((item) => item.id === params.id)
 
+  useEffect(() => {
+    if (activity) {
+      setLoadStatus("ready")
+      return
+    }
+    if (!hydrated) return
+
+    let active = true
+    setLoadStatus("loading")
+    void loadActivity(params.id)
+      .then((loaded) => {
+        if (active) setLoadStatus(loaded ? "ready" : "not-found")
+      })
+      .catch(() => {
+        if (active) setLoadStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [activity, hydrated, loadActivity, params.id, retryToken])
+
   if (!activity) {
+    if (!hydrated || loadStatus === "idle" || loadStatus === "loading" || loadStatus === "ready") {
+      return (
+        <div className="flex min-h-full items-center justify-center px-5 text-sm text-white/58" role="status">
+          Loading activity…
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
-          <h1 className="font-heading text-xl font-bold text-white">Activity not found</h1>
+          <h1 className="font-heading text-xl font-bold text-white">
+            {loadStatus === "error" ? "Could not load activity" : "Activity not found"}
+          </h1>
+          {loadStatus === "error" && (
+            <button
+              type="button"
+              onClick={() => setRetryToken((value) => value + 1)}
+              className="mt-4 inline-flex rounded-2xl bg-white/10 px-5 py-3 text-sm font-bold text-white"
+            >
+              Retry activity
+            </button>
+          )}
           <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Back to feed
           </Link>
@@ -35,7 +85,6 @@ export default function ActivityDetailPage() {
   const isWaitlisted = activity.userRsvp?.status === "waitlisted"
   const isFull = activity.seatsLeft === 0 && !isGoing
   const chatOpen = activity.goingCount >= 2 && isGoing
-  const [showRipple, setShowRipple] = useState(false)
   const toggleRsvp = async () => {
     if (pending) return
     setPending(true)
