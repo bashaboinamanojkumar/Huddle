@@ -9,7 +9,11 @@ import {
   useRef,
   useState,
 } from "react"
-import { normalizeCampusEmail, normalizeReturnPath } from "@/lib/auth/policy"
+import {
+  campusUniversityForEmail,
+  normalizeCampusEmail,
+  normalizeReturnPath,
+} from "@/lib/auth/policy"
 import { scoreFit } from "@/lib/scoring/score-fit"
 import { createClient } from "@/lib/supabase/client"
 import { toChatMessage } from "@/lib/supabase/mappers"
@@ -190,15 +194,6 @@ function addDays(date: Date, days: number): string {
   return result.toISOString()
 }
 
-/**
- * `umaryland.edu` is the Baltimore campus. Every other eligible domain — `umd.edu` and the
- * `terpmail.umd.edu` student mail domain — is College Park, which is also how
- * `handle_new_user` assigns `profiles.university_id` in the database.
- */
-function universityFor(email: string): UniversityId {
-  return email.endsWith("@umaryland.edu") ? "umb" : "umd"
-}
-
 function buildActivityViews(state: HuddleState, currentUserId: string): ActivityView[] {
   const profile =
     state.profiles.find((item) => item.userId === currentUserId) ?? ANONYMOUS_PROFILE
@@ -272,7 +267,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     const generation = ++sessionGeneration.current
     const supabase = createClient()
     const email = normalizeCampusEmail(identity.email) ?? identity.email
-    const universityId = universityFor(email)
+    const universityId = campusUniversityForEmail(email) ?? DEFAULT_UNIVERSITY_ID
 
     const snapshot = await fetchCoreHuddleSnapshot(
       supabase,
@@ -530,7 +525,7 @@ export function HuddleProvider({ children }: { children: React.ReactNode }) {
     [state, currentUserId]
   )
   const universityId = state.session
-    ? universityFor(state.session.email)
+    ? campusUniversityForEmail(state.session.email) ?? DEFAULT_UNIVERSITY_ID
     : DEFAULT_UNIVERSITY_ID
   const approvedActivities = useMemo(
     () =>

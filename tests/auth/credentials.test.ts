@@ -33,6 +33,15 @@ describe("campus email entry", () => {
 })
 
 describe("password sign-in entry", () => {
+  it("accepts an rx.maryland.edu address", () => {
+    expect(
+      validateSignIn({ email: " Pharmacy@RX.MARYLAND.EDU ", password: "correct horse" })
+    ).toEqual({
+      ok: true,
+      value: { email: "pharmacy@rx.maryland.edu", password: "correct horse" },
+    })
+  })
+
   it("passes the normalized address and the password through", () => {
     expect(validateSignIn({ email: "Student@umd.edu", password: "correct horse" })).toEqual({
       ok: true,
@@ -62,6 +71,19 @@ describe("password sign-in entry", () => {
 })
 
 describe("account creation entry", () => {
+  it("creates credentials for an rx.maryland.edu address", () => {
+    expect(
+      validateSignUp({
+        email: " Pharmacy@RX.MARYLAND.EDU ",
+        password: "terrapin24",
+        confirmation: "terrapin24",
+      })
+    ).toEqual({
+      ok: true,
+      value: { email: "pharmacy@rx.maryland.edu", password: "terrapin24" },
+    })
+  })
+
   it("accepts a matching password of sufficient length", () => {
     expect(
       validateSignUp({

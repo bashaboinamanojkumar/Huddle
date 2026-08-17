@@ -2,9 +2,9 @@
 
 Hurdle uses Supabase Auth's PKCE flow. Google redirects to Supabase first; Supabase then redirects the browser to Hurdle's `/auth/callback`, where the server exchanges the one-time code and stores the session in cookies.
 
-The application accepts only verified email addresses whose exact domain is `umd.edu`, `terpmail.umd.edu`, or `umaryland.edu`. `terpmail.umd.edu` is named explicitly because the comparison is exact equality, not a suffix test: every other `umd.edu` subdomain, such as `dept.umd.edu` or `mail.umd.edu`, is still rejected. Google hosted-domain hints are not authorization controls.
+The application accepts only verified email addresses whose exact domain is `umd.edu`, `terpmail.umd.edu`, `umaryland.edu`, or `rx.maryland.edu`. The two subdomains are explicit allow-list entries because the comparison is exact equality: every other campus subdomain, such as `dept.umd.edu`, `mail.umd.edu`, or `mail.rx.maryland.edu`, is still rejected. Google hosted-domain hints are not authorization controls.
 
-Adding `terpmail.umd.edu` needs no Google Cloud or Supabase change. It is a Google Workspace domain like the others, and the application never sends an `hd` hint, so the same OAuth client serves all three.
+Adding either named subdomain needs no separate Google Cloud or Supabase provider. The application never sends an `hd` hint, so the same OAuth client serves all four exact domains.
 
 Campus email and password is the second supported way in. This document covers Google; see
 [Email and Password Login Setup](./email-password-setup.md) for the rest.
@@ -140,8 +140,8 @@ Run this only in a protected server/operator environment. Never ship the `servic
 
 1. Visit `/app` in a signed-out private browser and confirm redirect to `/verify`.
 2. Select **Continue with Google** and confirm the Google account chooser appears.
-3. Complete login with an exact `umd.edu`, `terpmail.umd.edu`, or `umaryland.edu` account.
-4. Confirm a new local profile goes to `/onboarding`; repeat after onboarding and confirm it returns to `/app`.
+3. Complete login with an exact `umd.edu`, `terpmail.umd.edu`, `umaryland.edu`, or `rx.maryland.edu` account.
+4. Confirm a new local profile goes to `/onboarding`; for `rx.maryland.edu`, confirm its `university_id` is `umb`. Repeat after onboarding and confirm it returns to `/app`.
 5. Try a non-campus account, or an ineligible campus subdomain such as `dept.umd.edu`, and confirm it is signed out with the campus-account message.
 6. Confirm a normal campus user cannot render `/app/admin/review`.
 7. Assign `safety_owner`, refresh the session by signing out and back in, and confirm the review route renders.
