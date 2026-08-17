@@ -2,12 +2,13 @@
 
 Huddle accepts two ways to sign in: a campus Google account, and a campus email address with
 a password. Both are held to the same admission rules — a verified email whose exact domain is
-`umd.edu`, `terpmail.umd.edu`, or `umaryland.edu`. Everything else (phone, magic link, SSO,
+`umd.edu`, `terpmail.umd.edu`, `umaryland.edu`, or `rx.maryland.edu`. Everything else (phone, magic link, SSO,
 anonymous, other social providers) is still rejected and signed out.
 
 The eligible domains live in one place, `CAMPUS_DOMAINS` in `lib/auth/policy.ts`, and the
 sign-in copy and error messages are generated from that list. Matching is exact equality, so
-adding `terpmail.umd.edu` did not admit any other `umd.edu` subdomain.
+adding `terpmail.umd.edu` or `rx.maryland.edu` does not admit any other subdomain. School of
+Pharmacy `rx.maryland.edu` profiles are assigned to UMB (`university_id = 'umb'`).
 
 The application code is complete. The steps below are the Supabase dashboard configuration it
 depends on, and none of them can be committed to this repository.
@@ -126,8 +127,9 @@ Run this against the deployed origin after the settings above are saved.
 1. Open `/verify` signed out. Confirm both the Google button and the email form render.
 2. Enter a non-campus address such as `someone@gmail.com` and confirm the campus-email message
    appears without any request reaching Supabase.
-3. Create an account with an eligible campus address. Confirm the "check your inbox" panel appears
-   and no session is created.
+3. Create an account with an eligible campus address, including an `rx.maryland.edu` address.
+   Confirm the "check your inbox" panel appears and no session is created; after confirmation,
+   confirm the `rx.maryland.edu` profile has `university_id = 'umb'`.
 4. Open the confirmation email **on a different device**. Confirm the link host is your own origin
    with the path `/auth/confirm`, that it opens the "Confirm your email" review screen, and that
    pressing **Confirm email and create account** lands on `/onboarding`.
