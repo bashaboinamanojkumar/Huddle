@@ -222,6 +222,34 @@ describe("OAuth callback", () => {
     expect(result.errorCode).toBe("campus_account_required")
   })
 
+  it("continues a verified rx.maryland.edu account", async () => {
+    const auth = createAuth({
+      getUser: vi.fn().mockResolvedValue({
+        data: {
+          user: {
+            id: "user-rx",
+            email: "pharmacy@rx.maryland.edu",
+            email_confirmed_at: "2026-08-17T12:00:00.000Z",
+            app_metadata: { provider: "google", providers: ["google"] },
+            identities: [{ provider: "google" }],
+          },
+        },
+        error: null,
+      }),
+    })
+
+    const result = await processAuthCallback(
+      new URL("https://hurdle.example/auth/callback?code=pkce-code"),
+      auth
+    )
+
+    expect(auth.signOut).not.toHaveBeenCalled()
+    expect(result).toEqual({
+      destination: "/auth/continue?next=%2Fapp",
+      errorCode: null,
+    })
+  })
+
   it("continues a campus account that has both Google and a password linked", async () => {
     const auth = createAuth({
       getUser: vi.fn().mockResolvedValue({

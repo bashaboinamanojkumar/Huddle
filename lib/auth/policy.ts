@@ -1,8 +1,13 @@
 /**
- * `terpmail.umd.edu` is College Park's student mail domain and is listed in its own right
- * because matching is exact: every other `umd.edu` subdomain stays ineligible.
+ * `terpmail.umd.edu` and `rx.maryland.edu` are named explicitly because matching is exact:
+ * listing one campus subdomain must not admit any other subdomain automatically.
  */
-export const CAMPUS_DOMAINS = ["umd.edu", "terpmail.umd.edu", "umaryland.edu"] as const
+export const CAMPUS_DOMAINS = [
+  "umd.edu",
+  "terpmail.umd.edu",
+  "umaryland.edu",
+  "rx.maryland.edu",
+] as const
 
 export type CampusDomain = (typeof CAMPUS_DOMAINS)[number]
 
