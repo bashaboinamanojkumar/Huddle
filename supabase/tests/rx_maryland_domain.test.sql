@@ -2,14 +2,41 @@ begin;
 
 select plan(9);
 
+insert into auth.users (
+  instance_id,
+  id,
+  aud,
+  role,
+  email,
+  encrypted_password,
+  email_confirmed_at,
+  raw_app_meta_data,
+  raw_user_meta_data,
+  created_at,
+  updated_at
+)
+values (
+  '00000000-0000-0000-0000-000000000000',
+  '80000000-0000-4000-8000-000000000817',
+  'authenticated',
+  'authenticated',
+  'pharmacy-trigger@rx.maryland.edu',
+  '',
+  now(),
+  '{"provider":"google","providers":["google"]}'::jsonb,
+  '{"full_name":"Pharmacy Trigger"}'::jsonb,
+  now(),
+  now()
+);
+
 select is(
   (
     select university_id
     from public.profiles
-    where id = '00000000-0000-0000-0000-000000000817'
+    where id = '80000000-0000-4000-8000-000000000817'
   ),
   'umb',
-  'existing rx.maryland.edu profile is backfilled to UMB'
+  'new rx.maryland.edu auth user receives a UMB profile'
 );
 
 select is(
@@ -44,13 +71,13 @@ select is(
 );
 select matches(
   pg_get_functiondef('public.handle_new_user()'::regprocedure),
-  'huddle_university_id_for_email',
-  'new user trigger uses the shared database mapper'
+  'insert into public[.]notification_preferences',
+  'rx domain migration preserves notification provisioning for new users'
 );
 select matches(
   pg_get_functiondef('public.ensure_profile()'::regprocedure),
-  'huddle_university_id_for_email',
-  'profile repair uses the shared database mapper'
+  'insert into public[.]notification_preferences',
+  'rx domain migration preserves notification provisioning during profile repair'
 );
 
 select * from finish();
