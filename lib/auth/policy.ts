@@ -137,6 +137,23 @@ export function isEligibleCampusEmail(value: string): boolean {
   return normalizeCampusEmail(value) !== null
 }
 
+export type CampusUniversityId = "umd" | "umb"
+
+const UMB_CAMPUS_DOMAINS = new Set<CampusDomain>([
+  "umaryland.edu",
+  "rx.maryland.edu",
+])
+
+export function campusUniversityForEmail(value: string): CampusUniversityId | null {
+  const normalized = normalizeCampusEmail(value)
+  if (!normalized) {
+    return null
+  }
+
+  const domain = normalized.slice(normalized.lastIndexOf("@") + 1) as CampusDomain
+  return UMB_CAMPUS_DOMAINS.has(domain) ? "umb" : "umd"
+}
+
 export const GOOGLE_PROVIDER = "google"
 export const EMAIL_PROVIDER = "email"
 

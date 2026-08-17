@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   AUTH_ERROR_MESSAGES,
   CAMPUS_DOMAINS,
+  campusUniversityForEmail,
   formatCampusDomains,
   getAuthMessage,
   isAllowedProviderAccount,
@@ -55,6 +56,21 @@ describe("campus email policy", () => {
     expect(formatCampusDomains("and")).toBe(
       "@umd.edu, @terpmail.umd.edu, @umaryland.edu, and @rx.maryland.edu"
     )
+  })
+})
+
+describe("campus assignment", () => {
+  it.each([
+    ["student@umd.edu", "umd"],
+    ["student@terpmail.umd.edu", "umd"],
+    ["student@umaryland.edu", "umb"],
+    [" Pharmacy@RX.MARYLAND.EDU ", "umb"],
+  ])("maps %s to %s", (email, expected) => {
+    expect(campusUniversityForEmail(email)).toBe(expected)
+  })
+
+  it("does not classify an ineligible domain", () => {
+    expect(campusUniversityForEmail("student@mail.rx.maryland.edu")).toBeNull()
   })
 })
 
