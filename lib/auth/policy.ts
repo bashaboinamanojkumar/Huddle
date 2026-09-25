@@ -1,10 +1,21 @@
 /**
- * `terpmail.umd.edu` is College Park's student mail domain and is listed in its own right
- * because matching is exact: every other `umd.edu` subdomain stays ineligible.
+ * `terpmail.umd.edu` and `rx.umaryland.edu` are listed in their own right because
+ * matching is exact: every other `umd.edu` or `umaryland.edu` subdomain stays ineligible.
  */
-export const CAMPUS_DOMAINS = ["umd.edu", "terpmail.umd.edu", "umaryland.edu"] as const
+export const CAMPUS_DOMAINS = [
+  "umd.edu",
+  "terpmail.umd.edu",
+  "umaryland.edu",
+  "rx.umaryland.edu",
+] as const
 
 export type CampusDomain = (typeof CAMPUS_DOMAINS)[number]
+export type CampusUniversityId = "umd" | "umb"
+
+const UMB_CAMPUS_DOMAINS = new Set<CampusDomain>([
+  "umaryland.edu",
+  "rx.umaryland.edu",
+])
 
 /**
  * Copy that has to name every eligible domain is built from `CAMPUS_DOMAINS`, so adding one
@@ -126,6 +137,16 @@ export function normalizeCampusEmail(value: string): string | null {
   }
 
   return normalized
+}
+
+export function campusUniversityForEmail(value: string): CampusUniversityId | null {
+  const normalized = normalizeCampusEmail(value)
+  if (!normalized) {
+    return null
+  }
+
+  const domain = normalized.slice(normalized.lastIndexOf("@") + 1) as CampusDomain
+  return UMB_CAMPUS_DOMAINS.has(domain) ? "umb" : "umd"
 }
 
 export function isEligibleCampusEmail(value: string): boolean {

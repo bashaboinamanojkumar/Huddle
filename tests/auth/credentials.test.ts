@@ -11,6 +11,7 @@ describe("campus email entry", () => {
   it.each([
     ["  Student@UMD.EDU ", "student@umd.edu"],
     ["  Terp@TerpMail.UMD.EDU ", "terp@terpmail.umd.edu"],
+    ["  Yuqi.Zhou@RX.UMARYLAND.EDU ", "yuqi.zhou@rx.umaryland.edu"],
   ])("normalizes an eligible address: %s", (email, expected) => {
     expect(validateCampusEmail(email)).toEqual({ ok: true, value: expected })
   })
@@ -19,6 +20,8 @@ describe("campus email entry", () => {
     "student@gmail.com",
     "student@mail.umd.edu",
     "student@mail.terpmail.umd.edu",
+    "student@mail.rx.umaryland.edu",
+    "student@rx.umaryland.edu.evil.test",
     "student",
     "",
   ])(
@@ -34,9 +37,11 @@ describe("campus email entry", () => {
 
 describe("password sign-in entry", () => {
   it("passes the normalized address and the password through", () => {
-    expect(validateSignIn({ email: "Student@umd.edu", password: "correct horse" })).toEqual({
+    expect(
+      validateSignIn({ email: "Yuqi.Zhou@RX.UMARYLAND.EDU", password: "correct horse" })
+    ).toEqual({
       ok: true,
-      value: { email: "student@umd.edu", password: "correct horse" },
+      value: { email: "yuqi.zhou@rx.umaryland.edu", password: "correct horse" },
     })
   })
 
@@ -65,11 +70,14 @@ describe("account creation entry", () => {
   it("accepts a matching password of sufficient length", () => {
     expect(
       validateSignUp({
-        email: "Student@UMD.edu",
+        email: "Yuqi.Zhou@RX.UMARYLAND.EDU",
         password: "terrapin24",
         confirmation: "terrapin24",
       })
-    ).toEqual({ ok: true, value: { email: "student@umd.edu", password: "terrapin24" } })
+    ).toEqual({
+      ok: true,
+      value: { email: "yuqi.zhou@rx.umaryland.edu", password: "terrapin24" },
+    })
   })
 
   it("rejects an ineligible address before checking the password", () => {

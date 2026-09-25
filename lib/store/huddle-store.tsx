@@ -9,7 +9,11 @@ import {
   useRef,
   useState,
 } from "react"
-import { normalizeCampusEmail, normalizeReturnPath } from "@/lib/auth/policy"
+import {
+  campusUniversityForEmail,
+  normalizeCampusEmail,
+  normalizeReturnPath,
+} from "@/lib/auth/policy"
 import { scoreFit } from "@/lib/scoring/score-fit"
 import { createClient } from "@/lib/supabase/client"
 import { toChatMessage } from "@/lib/supabase/mappers"
@@ -149,13 +153,8 @@ function addDays(date: Date, days: number): string {
   return result.toISOString()
 }
 
-/**
- * `umaryland.edu` is the Baltimore campus. Every other eligible domain — `umd.edu` and the
- * `terpmail.umd.edu` student mail domain — is College Park, which is also how
- * `handle_new_user` assigns `profiles.university_id` in the database.
- */
 function universityFor(email: string): UniversityId {
-  return email.endsWith("@umaryland.edu") ? "umb" : "umd"
+  return campusUniversityForEmail(email) ?? "umd"
 }
 
 function buildActivityViews(state: HuddleState, currentUserId: string): ActivityView[] {
