@@ -2,11 +2,12 @@
 
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { EventsMap } from "@/components/huddle/events-map"
-import { List, Map as MapIcon } from "lucide-react"
+import { List, Map as MapIcon, Search, ShieldAlert } from "lucide-react"
 import { useMemo, useState } from "react"
 import Link from "next/link"
-import { Bell, Search, ShieldAlert } from "lucide-react"
 import { ActivityCard } from "@/components/huddle/activity-card"
+import { HuddleWordmark } from "@/components/huddle/huddle-icons"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 import { useHuddle } from "@/lib/store/huddle-store"
 import { categoryMeta } from "@/lib/data/metadata"
@@ -46,42 +47,50 @@ export default function CommunityPage() {
 
   return (
     <div className="min-h-full bg-background">
-      <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
+      <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
-                {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
-            </p>
-            <h1 className="mt-2 font-heading text-3xl font-black leading-none text-white">
-              All events
-            </h1>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 border border-white/10">
+              <img src="/huddle-icon.png" alt="" className="h-10 w-10 object-contain" />
+            </div>
+            <HuddleWordmark className="text-white text-lg" />
           </div>
-          <Link
-            href="/app/profile"
-            className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
-            style={{ backgroundColor: currentProfile.photoColor }}
-            aria-label="Open profile"
-          >
-            {currentProfile.displayName.charAt(0)}
-          </Link>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <Link
+              href="/app/profile"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+              style={{ backgroundColor: currentProfile.photoColor }}
+              aria-label="Open profile"
+            >
+              {currentProfile.displayName.charAt(0)}
+            </Link>
+          </div>
         </div>
 
+        <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
+          All events
+        </h1>
+        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/62">
+          {universityId === "umb" ? "Huddle UMB" : "Huddle UMD"}
+        </p>
+
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{approvedActivities.length}</p>
             <p className="text-[11px] text-white/62">joinable</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.streakDays}</p>
             <p className="text-[11px] text-white/62">day streak</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.points}</p>
             <p className="text-[11px] text-white/62">points</p>
           </div>
         </div>
 
-        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-black/22 px-4 py-2">
+        <div className="mt-5 flex items-center gap-3 rounded-2xl bg-white/8 px-4 py-2">
           <Search className="h-5 w-5 text-white/48" />
           <input
             value={search}
@@ -89,7 +98,6 @@ export default function CommunityPage() {
             placeholder="Search activities or locations"
             className="min-h-11 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-white/42"
           />
-          <Bell className="h-5 w-5 text-white/48" />
         </div>
       </header>
 
@@ -136,7 +144,7 @@ export default function CommunityPage() {
               className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
                 category === "all"
                   ? "border-secondary bg-secondary/18"
-                  : "border-white/10 bg-white/6"
+                  : "border-white/6 bg-transparent"
               }`}
             >
               <span className="text-2xl">✦</span>
@@ -151,7 +159,7 @@ export default function CommunityPage() {
                 className={`shrink-0 flex flex-col items-center justify-center gap-2 rounded-3xl p-4 w-24 border ${
                   category === item.id
                     ? "border-secondary bg-secondary/18"
-                    : "border-white/10 bg-white/6"
+                    : "border-white/6 bg-transparent"
                 }`}
               >
                 <CategoryIcon

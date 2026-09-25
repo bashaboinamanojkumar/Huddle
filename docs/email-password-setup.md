@@ -2,12 +2,13 @@
 
 Huddle accepts two ways to sign in: a campus Google account, and a campus email address with
 a password. Both are held to the same admission rules — a verified email whose exact domain is
-`umd.edu`, `terpmail.umd.edu`, `umaryland.edu`, or `rx.umaryland.edu`. Everything else (phone,
-magic link, SSO, anonymous, other social providers) is still rejected and signed out.
+`umd.edu`, `terpmail.umd.edu`, `umaryland.edu`, `rx.umaryland.edu`, or `rx.maryland.edu`. Everything else (phone, magic link, SSO,
+anonymous, other social providers) is still rejected and signed out.
 
 The eligible domains live in one place, `CAMPUS_DOMAINS` in `lib/auth/policy.ts`, and the
 sign-in copy and error messages are generated from that list. Matching is exact equality, so
-adding `terpmail.umd.edu` or `rx.umaryland.edu` did not admit any other campus subdomain.
+adding `terpmail.umd.edu`, `rx.umaryland.edu`, or `rx.maryland.edu` does not admit any other subdomain. School of
+Pharmacy `rx.umaryland.edu` and `rx.maryland.edu` profiles are assigned to UMB (`university_id = 'umb'`).
 
 The application code is complete. The steps below are the Supabase dashboard configuration it
 depends on, and none of them can be committed to this repository.
@@ -98,10 +99,11 @@ dead link. A `token_hash` carries no such dependency and verifies from any devic
 `{{ .RedirectTo }}` is the origin the browser sent, with no trailing slash, so the rendered link
 becomes `https://myhuddle.vercel.app/auth/confirm?token_hash=...`. Do not add a slash after it.
 
-`/auth/confirm` does not spend the one-time token during that first `GET`. It stores the token in
-a short-lived, HTTP-only cookie and redirects to a review screen where the student must press a
-button. The resulting `POST` performs `verifyOtp`. This protects campus users from Microsoft
-Defender Safe Links and other email scanners that prefetch links before the student opens them.
+For the customized `token_hash` links above, `/auth/confirm` does not spend the one-time token
+during the first `GET`. It stores the token in a short-lived, HTTP-only cookie and redirects to a
+review screen where the student must press a button. The resulting `POST` performs `verifyOtp`.
+This protects campus users from Microsoft Defender Safe Links and other email scanners that
+prefetch links before the student opens them.
 
 If a template is left unedited, the confirmation still succeeds — Supabase verifies the token on
 its own domain first — but the student lands on the home page instead of being signed in, and has
@@ -125,8 +127,9 @@ Run this against the deployed origin after the settings above are saved.
 1. Open `/verify` signed out. Confirm both the Google button and the email form render.
 2. Enter a non-campus address such as `someone@gmail.com` and confirm the campus-email message
    appears without any request reaching Supabase.
-3. Create an account with an eligible campus address, including a `rx.umaryland.edu` address.
-   Confirm the "check your inbox" panel appears and no session is created.
+3. Create an account with an eligible campus address, including an `rx.umaryland.edu` or `rx.maryland.edu` address.
+   Confirm the "check your inbox" panel appears and no session is created; after confirmation,
+   confirm the pharmacy profile has `university_id = 'umb'`.
 4. Open the confirmation email **on a different device**. Confirm the link host is your own origin
    with the path `/auth/confirm`, that it opens the "Confirm your email" review screen, and that
    pressing **Confirm email and create account** lands on `/onboarding`.

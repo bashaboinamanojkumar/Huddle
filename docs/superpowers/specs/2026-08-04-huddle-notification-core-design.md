@@ -12,7 +12,7 @@ The notification system must not join `fetchHuddleSnapshot()`. That snapshot ref
 
 ## Approved product decisions
 
-- Use a compact global Huddle header with an accessible notification bell and unread count.
+- Expose an accessible notification bell with unread count only in the page-specific Feed and Community headers.
 - Use one grouped chronological inbox with `Today` and `This week` sections.
 - Ask for push permission only after the first successful RSVP.
 - On iPhone and iPad, installation comes before push permission.
@@ -115,7 +115,7 @@ RLS permits owners to select their notification rows, preferences, and subscript
 
 The provider is mounted inside authenticated application UI, not around public routes. Realtime uses a `user_id` filter and selects only the notification columns needed by the client. Coalescing updates replace the existing item, move it by `last_event_at`, and restore unread state.
 
-The chosen global header appears above the app scroll area. Its bell links to `/app/notifications`, exposes the unread count with accessible text, and does not replace any bottom-navigation tab. The Chats tab displays a dot when unread chat notifications exist.
+Feed and Community each place the shared notification bell in their existing page-specific header. Feed orders its actions Bell, Share, then Profile; Community orders Bell, then Profile. Other authenticated routes retain their own page-specific chrome without a notification bell or a separate global header. The bell links to `/app/notifications`, exposes the unread count with accessible text, and does not replace any bottom-navigation tab. The Chats tab displays a dot when unread chat notifications exist.
 
 The inbox uses the approved grouped chronological layout. Activating a row marks it read and then navigates to its validated application path. The inbox supports a mark-all-read action and cursor-based load-more behavior.
 

@@ -41,6 +41,16 @@ describe("protected session synchronization", () => {
     ).toEqual({ kind: "ready" })
   })
 
+  it("renders protected content for an rx.maryland.edu account", () => {
+    expect(
+      decideSessionSync({
+        lookup: authenticated({ email: "pharmacy@rx.maryland.edu" }),
+        localSession: localSession(),
+        now: NOW,
+      })
+    ).toEqual({ kind: "ready" })
+  })
+
   it("adopts the Supabase identity when no local session exists", () => {
     expect(
       decideSessionSync({ lookup: authenticated(), localSession: null, now: NOW })

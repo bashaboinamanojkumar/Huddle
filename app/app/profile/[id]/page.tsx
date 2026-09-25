@@ -1,12 +1,14 @@
 "use client"
 
-import { useMemo } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { ArrowLeft, Award, CalendarHeart, GraduationCap, UserCheck, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 import { getCategoryMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
+import { CategoryIcon } from "@/components/huddle/category-icon"
+
 
 const statusLabels: Record<string, string> = {
   undergrad_1: "Freshman",
@@ -31,9 +33,43 @@ const badges = [
 export default function StudentProfilePage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const { state, currentUserId, approvedActivities, addFriend, acceptFriend, declineFriend } = useHuddle()
+  const {
+    state,
+    currentUserId,
+    approvedActivities,
+    hydrated,
+    loadProfile,
+    addFriend,
+    acceptFriend,
+    declineFriend,
+    unfriend,
+    sendDirectMessage,
+  } = useHuddle()
 
   const profile = state.profiles.find((p) => p.userId === params.id)
+  const [loadStatus, setLoadStatus] = useState<"idle" | "loading" | "ready" | "not-found" | "error">("idle")
+  const [retryToken, setRetryToken] = useState(0)
+
+  useEffect(() => {
+    if (profile) {
+      setLoadStatus("ready")
+      return
+    }
+    if (!hydrated) return
+
+    let active = true
+    setLoadStatus("loading")
+    void loadProfile(params.id)
+      .then((loaded) => {
+        if (active) setLoadStatus(loaded ? "ready" : "not-found")
+      })
+      .catch(() => {
+        if (active) setLoadStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [hydrated, loadProfile, params.id, profile, retryToken])
 
   const friendConnection = useMemo(
     () => state.friends.find(
@@ -48,6 +84,10 @@ export default function StudentProfilePage() {
   const isIncoming = isPending && friendConnection?.userId === params.id
   const isOutgoing = isPending && friendConnection?.userId === currentUserId
 
+  const [dmBody, setDmBody] = useState("")
+  const [showDm, setShowDm] = useState(false)
+  const [friendMessage, setFriendMessage] = useState("")
+  const [showFriendMsg, setShowFriendMsg] = useState(false)
   const sharedInterests = useMemo(() => {
     const myProfile = state.profiles.find((p) => p.userId === currentUserId)
     if (!myProfile || !profile) return []
@@ -67,10 +107,29 @@ export default function StudentProfilePage() {
   )
 
   if (!profile) {
+    if (!hydrated || loadStatus === "idle" || loadStatus === "loading" || loadStatus === "ready") {
+      return (
+        <div className="flex min-h-full items-center justify-center px-5 text-sm text-white/58" role="status">
+          Loading profile…
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
-          <h1 className="font-heading text-xl font-bold text-white">Profile not found</h1>
+          <h1 className="font-heading text-xl font-bold text-white">
+            {loadStatus === "error" ? "Could not load profile" : "Profile not found"}
+          </h1>
+          {loadStatus === "error" && (
+            <button
+              type="button"
+              onClick={() => setRetryToken((value) => value + 1)}
+              className="mt-4 inline-flex rounded-2xl bg-white/10 px-5 py-3 text-sm font-bold text-white"
+            >
+              Retry profile
+            </button>
+          )}
           <Link href="/app" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Back to feed
           </Link>
@@ -107,9 +166,12 @@ export default function StudentProfilePage() {
               {statusLabels[profile.status] ?? "Student"}
             </div>
             {sharedInterests.length > 0 && (
-              <p className="mt-1 text-xs text-secondary font-semibold">
-                〰️ Same wavelength on {sharedInterests.length} interest{sharedInterests.length > 1 ? "s" : ""}
-              </p>
+              <div className="mt-1 flex items-center gap-1">
+                <img src="/icons/categories/same-wavelength.png" alt="same wavelength" className="h-4 w-4 object-contain" style={{ mixBlendMode: "screen" }} />
+                <p className="text-xs text-secondary font-semibold">
+                  Same wavelength on {sharedInterests.length} interest{sharedInterests.length > 1 ? "s" : ""}
+                </p>
+              </div>
             )}
           </div>
         </div>
@@ -132,9 +194,59 @@ export default function StudentProfilePage() {
         {!isMe && (
           <div className="mt-5">
             {isAccepted && (
-              <div className="flex items-center justify-center gap-2 rounded-2xl bg-mint/18 px-4 py-3 text-sm font-bold text-mint">
-                <UserCheck className="h-4 w-4" />
-                Friends
+              <div className="space-y-2">
+                {showDm && (
+                  <div className="flex gap-2">
+                    <input
+                      value={dmBody}
+                      onChange={(e) => setDmBody(e.target.value)}
+                      placeholder="Write a message..."
+                      className="flex-1 rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-white outline-none placeholder:text-white/34"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        if (!dmBody.trim()) return
+                        try {
+                          await sendDirectMessage(profile.userId, dmBody.trim())
+                          toast.success("Message sent!")
+                          setDmBody("")
+                          setShowDm(false)
+                        } catch {
+                          toast.error("Could not send message.")
+                        }
+                      }}
+                      className="rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground"
+                    >
+                      Send
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowDm(!showDm)}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground"
+                  >
+                    <UserCheck className="h-4 w-4" />
+                    {showDm ? "Cancel" : "Message"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await unfriend(profile.userId)
+                        toast("Unfriended.")
+                        router.back()
+                      } catch {
+                        toast.error("Could not unfriend.")
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white/60"
+                  >
+                    Unfriend
+                  </button>
+                </div>
               </div>
             )}
             {isOutgoing && (
@@ -177,21 +289,42 @@ export default function StudentProfilePage() {
               </div>
             )}
             {!friendConnection && (
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await addFriend(profile.userId)
-                    toast.success("Friend request sent!")
-                  } catch {
-                    toast.error("Could not send request.")
-                  }
-                }}
-                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground"
-              >
-                <UserPlus className="h-4 w-4" />
-                Connect
-              </button>
+              <div className="space-y-2">
+                {showFriendMsg && (
+                  <input
+                    value={friendMessage}
+                    onChange={(e) => setFriendMessage(e.target.value)}
+                    placeholder="Add a message (optional)"
+                    className="w-full rounded-2xl border border-white/10 bg-white/8 px-4 py-3 text-sm text-white outline-none placeholder:text-white/34"
+                  />
+                )}
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowFriendMsg(!showFriendMsg)}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white"
+                  >
+                    {showFriendMsg ? "Cancel" : "Add message"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        await addFriend(profile.userId, friendMessage)
+                        toast.success("Friend request sent!")
+                        setShowFriendMsg(false)
+                        setFriendMessage("")
+                      } catch {
+                        toast.error("Could not send request.")
+                      }
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-secondary px-4 py-3 text-sm font-bold text-secondary-foreground"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Connect
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -205,14 +338,20 @@ export default function StudentProfilePage() {
               const meta = getCategoryMeta(interest)
               const isShared = sharedInterests.includes(interest)
               return (
-                <span
+                <div
                   key={interest}
-                  className={`rounded-full px-3 py-2 text-xs font-bold ${
-                    isShared ? "bg-secondary/20 text-secondary" : "bg-white/8 text-white/62"
+                  className={`flex items-center gap-2 rounded-full px-3 py-2 ${
+                    isShared ? "bg-secondary/20" : "bg-white/8"
                   }`}
                 >
-                  {isShared && "〰️ "}{meta.shortLabel}
-                </span>
+                  <CategoryIcon category={interest} className="h-4 w-4" />
+                  <span className={`text-xs font-bold ${isShared ? "text-secondary" : "text-white/62"}`}>
+                    {meta.shortLabel}
+                  </span>
+                  {isShared && (
+                    <img src="/icons/categories/same-wavelength.png" alt="same wavelength" className="h-3.5 w-3.5 object-contain" style={{ mixBlendMode: "screen" }} />
+                  )}
+                </div>
               )
             })}
           </div>

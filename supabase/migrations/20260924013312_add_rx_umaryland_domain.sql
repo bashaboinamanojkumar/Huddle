@@ -7,7 +7,7 @@ set search_path = ''
 as $$
   select case
     when lower(btrim(coalesce(p_email, ''))) ~
-      '^[^[:space:]@]+@(umaryland[.]edu|rx[.]umaryland[.]edu)$'
+      '^[^[:space:]@]+@(umaryland[.]edu|rx[.]umaryland[.]edu|rx[.]maryland[.]edu)$'
       then 'umb'
     else 'umd'
   end;

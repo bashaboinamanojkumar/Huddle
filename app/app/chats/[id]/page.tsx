@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useRef } from "react"
+import { useCallback, useEffect, useMemo, useState, useRef } from "react"
 
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
@@ -8,6 +8,7 @@ import { ArrowLeft, Flag, Lock, MapPin, Send, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { formatActivityDate, formatActivityTime } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
+import type { MessageCursor } from "@/lib/supabase/query-contracts"
 
 function isArchived(startTime: string) {
   const archiveAt = new Date(startTime)
@@ -18,12 +19,66 @@ function isArchived(startTime: string) {
 export default function ChatThreadPage() {
   const params = useParams<{ id: string }>()
   const router = useRouter()
-  const { activities, state, currentUserId, sendMessage, reportSafetyConcern, leaveActivity } = useHuddle()
+  const {
+    activities,
+    state,
+    currentUserId,
+    hydrated,
+    loadActivity,
+    loadActivityMessages,
+    sendMessage,
+    reportSafetyConcern,
+    leaveActivity,
+  } = useHuddle()
   const [body, setBody] = useState("")
   const [sending, setSending] = useState(false)
   const [isTyping, setIsTyping] = useState(false)
+  const [activityStatus, setActivityStatus] = useState<"idle" | "loading" | "ready" | "not-found" | "error">("idle")
+  const [messageStatus, setMessageStatus] = useState<"idle" | "loading" | "ready" | "error">("idle")
+  const [nextCursor, setNextCursor] = useState<MessageCursor | null>(null)
+  const [failedCursor, setFailedCursor] = useState<MessageCursor | null>(null)
+  const [activityRetry, setActivityRetry] = useState(0)
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const activity = activities.find((item) => item.id === params.id)
+
+  useEffect(() => {
+    if (activity) {
+      setActivityStatus("ready")
+      return
+    }
+    if (!hydrated) return
+
+    let active = true
+    setActivityStatus("loading")
+    void loadActivity(params.id)
+      .then((loaded) => {
+        if (active) setActivityStatus(loaded ? "ready" : "not-found")
+      })
+      .catch(() => {
+        if (active) setActivityStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [activity, activityRetry, hydrated, loadActivity, params.id])
+
+  const requestMessagePage = useCallback(async (cursor: MessageCursor | null) => {
+    setMessageStatus("loading")
+    try {
+      const next = await loadActivityMessages(params.id, cursor)
+      setNextCursor(next)
+      setFailedCursor(null)
+      setMessageStatus("ready")
+    } catch {
+      setFailedCursor(cursor)
+      setMessageStatus("error")
+    }
+  }, [loadActivityMessages, params.id])
+
+  useEffect(() => {
+    if (!activity) return
+    void requestMessagePage(null)
+  }, [activity?.id, requestMessagePage])
 
   const messages = useMemo(
     () =>
@@ -34,10 +89,29 @@ export default function ChatThreadPage() {
   )
 
   if (!activity) {
+    if (!hydrated || activityStatus === "idle" || activityStatus === "loading" || activityStatus === "ready") {
+      return (
+        <div className="flex min-h-full items-center justify-center px-5 text-center text-sm text-white/58" role="status">
+          Loading chat…
+        </div>
+      )
+    }
+
     return (
       <div className="flex min-h-full items-center justify-center px-5 text-center">
         <div className="glass-card rounded-[2rem] p-6">
-          <h1 className="font-heading text-xl font-bold text-white">Chat not found</h1>
+          <h1 className="font-heading text-xl font-bold text-white">
+            {activityStatus === "error" ? "Could not load chat" : "Chat not found"}
+          </h1>
+          {activityStatus === "error" && (
+            <button
+              type="button"
+              onClick={() => setActivityRetry((value) => value + 1)}
+              className="mt-4 inline-flex rounded-2xl bg-white/10 px-5 py-3 text-sm font-bold text-white"
+            >
+              Retry chat
+            </button>
+          )}
           <Link href="/app/chats" className="mt-4 inline-flex rounded-2xl bg-secondary px-5 py-3 text-sm font-bold text-secondary-foreground">
             Back to chats
           </Link>
@@ -146,6 +220,28 @@ export default function ChatThreadPage() {
       )}
 
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
+        {nextCursor && messageStatus !== "error" && (
+          <button
+            type="button"
+            disabled={messageStatus === "loading"}
+            onClick={() => void requestMessagePage(nextCursor)}
+            className="mx-auto block rounded-2xl bg-white/8 px-4 py-2 text-xs font-bold text-white/62 disabled:opacity-50"
+          >
+            {messageStatus === "loading" ? "Loading…" : "Load earlier messages"}
+          </button>
+        )}
+        {messageStatus === "error" && (
+          <div className="rounded-2xl bg-coral/10 px-4 py-3 text-center">
+            <p className="text-xs text-white/58">Messages could not be loaded.</p>
+            <button
+              type="button"
+              onClick={() => void requestMessagePage(failedCursor)}
+              className="mt-2 rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
+            >
+              Retry messages
+            </button>
+          </div>
+        )}
         {messages.map((message) => {
           const author = state.profiles.find((profile) => profile.userId === message.userId)
           const isMine = message.userId === currentUserId

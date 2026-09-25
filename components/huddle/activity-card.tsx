@@ -8,6 +8,7 @@ import { CategoryIcon } from "@/components/huddle/category-icon"
 import { formatActivityDate, formatActivityTime, getCategoryMeta } from "@/lib/format"
 import { useHuddle } from "@/lib/store/huddle-store"
 import type { ActivityView } from "@/lib/types/huddle"
+import { RSVP_SUCCESS_EVENT } from "@/lib/notifications/push"
 
 export function ActivityCard({ activity }: { activity: ActivityView }) {
   const { rsvpActivity, leaveActivity } = useHuddle()
@@ -29,7 +30,10 @@ export function ActivityCard({ activity }: { activity: ActivityView }) {
       }
 
       const status = await rsvpActivity(activity.id)
-      if (status === "going") toast.success("Paws in! Chat opens when the group has 2+ students.")
+      if (status === "going") {
+        window.dispatchEvent(new Event(RSVP_SUCCESS_EVENT))
+        toast.success("Paws in! Chat opens when the group has 2+ students.")
+      }
       if (status === "waitlisted") toast("This activity is full — you're on the waitlist.")
       if (status === "full") toast("This activity is no longer open.")
     } catch {

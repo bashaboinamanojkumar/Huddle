@@ -6,6 +6,7 @@ import {
   toHuddleActivity,
   toHuddleProfile,
   toHuddleRsvp,
+  toPulseResponseView,
   toSafetyFlag,
 } from "@/lib/supabase/mappers"
 import type {
@@ -13,6 +14,7 @@ import type {
   FriendConnectionRow,
   MessageRow,
   PublicProfile,
+  PulseRow,
   RsvpRow,
   SafetyFlagRow,
 } from "@/lib/types/database"
@@ -190,5 +192,25 @@ describe("safety flag mapping", () => {
     const flag = toSafetyFlag(row)
     expect(flag.reviewer).toBeUndefined()
     expect(flag.resolvedAt).toBeUndefined()
+  })
+})
+
+describe("pulse response mapping", () => {
+  it("returns only owner-view fields and preserves an unrated null", () => {
+    const row: PulseRow = {
+      id: "pulse-1",
+      activity_id: "activity-1",
+      user_id: "user-1",
+      did_meet: false,
+      rating: null,
+      created_at: "2026-08-04T12:00:00.000Z",
+    }
+
+    expect(toPulseResponseView(row)).toEqual({
+      activityId: "activity-1",
+      didMeet: false,
+      rating: null,
+      createdAt: "2026-08-04T12:00:00.000Z",
+    })
   })
 })

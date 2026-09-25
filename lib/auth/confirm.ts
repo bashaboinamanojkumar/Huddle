@@ -15,6 +15,8 @@ export type ConfirmableOtpType = "signup" | "email" | "recovery"
 
 const CONFIRMABLE_OTP_TYPES: readonly string[] = ["signup", "email", "recovery"]
 
+export const EMAIL_CONFIRMATION_COOKIE = "huddle-email-confirmation"
+
 export interface ConfirmAuth extends CallbackAuth {
   verifyOtp: (params: {
     token_hash: string
@@ -22,7 +24,7 @@ export interface ConfirmAuth extends CallbackAuth {
   }) => Promise<{ error: unknown | null }>
 }
 
-function isConfirmableOtpType(value: string | null): value is ConfirmableOtpType {
+export function isConfirmableOtpType(value: string | null): value is ConfirmableOtpType {
   return value !== null && CONFIRMABLE_OTP_TYPES.includes(value)
 }
 

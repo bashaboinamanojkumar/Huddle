@@ -18,6 +18,7 @@ import type {
   HuddleProfile,
   HuddleRsvp,
   Pulse,
+  PulseResponseView,
   SafetyFlag,
   SafetyReport,
   UniversityId,
@@ -140,6 +141,15 @@ export function toPulse(row: PulseRow): Pulse {
     userId: row.user_id,
     didMeet: row.did_meet,
     rating: row.rating ?? undefined,
+    createdAt: row.created_at,
+  }
+}
+
+export function toPulseResponseView(row: PulseRow): PulseResponseView {
+  return {
+    activityId: row.activity_id,
+    didMeet: row.did_meet,
+    rating: row.rating,
     createdAt: row.created_at,
   }
 }
