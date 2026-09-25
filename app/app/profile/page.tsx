@@ -6,6 +6,7 @@ import { useState } from "react"
 import { AlertTriangle, Award, MessageSquarePlus, ShieldCheck, Siren, UserRound } from "lucide-react"
 import { toast } from "sonner"
 import { crisisResources } from "@/lib/config/crisis"
+import { ProfileNotificationSettingsSection } from "@/components/notifications/notification-settings-navigation"
 import { getCategoryMeta } from "@/lib/format"
 import { signOutEverywhere } from "@/lib/auth/sign-out"
 import { useHuddle } from "@/lib/store/huddle-store"
@@ -116,6 +117,8 @@ export default function ProfilePage() {
           Edit setup
         </Link>
       </section>
+
+      <ProfileNotificationSettingsSection />
 
       <section className="mt-5 glass-card rounded-[2rem] p-5">
         <div className="flex items-center gap-3">

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Check, Clock, Flag, ShieldCheck, X } from "lucide-react"
 import { toast } from "sonner"
@@ -19,9 +19,33 @@ const flagActions: { status: SafetyFlag["status"]; label: string }[] = [
 ]
 
 export default function ReviewQueuePage() {
-  const { pendingActivities, state, resolveFlag, reviewActivity } = useHuddle()
+  const {
+    pendingActivities,
+    state,
+    loadSafetyReview,
+    resolveFlag,
+    reviewActivity,
+  } = useHuddle()
   const [busy, setBusy] = useState(false)
+  const [loadStatus, setLoadStatus] = useState<"loading" | "ready" | "error">("loading")
+  const [retryToken, setRetryToken] = useState(0)
   const openFlags = state.flags.filter((flag) => flag.status === "open")
+  const openReports = state.reports.filter((report) => report.status === "open")
+
+  useEffect(() => {
+    let active = true
+    setLoadStatus("loading")
+    void loadSafetyReview()
+      .then(() => {
+        if (active) setLoadStatus("ready")
+      })
+      .catch(() => {
+        if (active) setLoadStatus("error")
+      })
+    return () => {
+      active = false
+    }
+  }, [loadSafetyReview, retryToken])
 
   const review = async (activityId: string, status: "approved" | "rejected") => {
     if (busy) return
@@ -65,6 +89,26 @@ export default function ReviewQueuePage() {
         </p>
       </header>
 
+      {loadStatus === "loading" && (
+        <div className="glass-card mt-5 rounded-[2rem] p-5 text-sm text-white/58" role="status">
+          Loading review queue…
+        </div>
+      )}
+      {loadStatus === "error" && (
+        <div className="glass-card mt-5 rounded-[2rem] p-5">
+          <p className="text-sm text-white/58">The review queue could not be loaded.</p>
+          <button
+            type="button"
+            onClick={() => setRetryToken((value) => value + 1)}
+            className="mt-3 rounded-2xl bg-white/10 px-4 py-3 text-sm font-bold text-white"
+          >
+            Retry review queue
+          </button>
+        </div>
+      )}
+
+      {loadStatus === "ready" && (
+        <>
       <section className="mt-5 glass-card rounded-[2rem] p-5">
         <div className="flex items-center gap-3">
           <Clock className="h-5 w-5 text-secondary" />
@@ -137,8 +181,19 @@ export default function ReviewQueuePage() {
           {openFlags.length === 0 && (
             <p className="rounded-3xl bg-white/6 p-4 text-sm text-white/54">No open safety flags.</p>
           )}
+          {openReports.map((report) => (
+            <div key={report.id} className="rounded-3xl border border-white/10 bg-white/6 p-4">
+              <span className="rounded-full bg-coral/18 px-3 py-1 text-xs font-bold text-coral">report</span>
+              <p className="mt-3 text-sm leading-6 text-white/64">{report.context}</p>
+              <p className="mt-2 text-[11px] text-white/38">
+                {new Date(report.createdAt).toLocaleString()}
+              </p>
+            </div>
+          ))}
         </div>
       </section>
+        </>
+      )}
 
       <section className="mt-5 rounded-[2rem] border border-mint/20 bg-mint/10 p-5">
         <div className="flex gap-3">

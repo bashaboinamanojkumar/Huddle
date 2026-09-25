@@ -149,6 +149,13 @@ export interface Pulse {
   createdAt: string
 }
 
+export interface PulseResponseView {
+  activityId: string
+  didMeet: boolean
+  rating: number | null
+  createdAt: string
+}
+
 export interface FriendConnection {
   id: string
   userId: string

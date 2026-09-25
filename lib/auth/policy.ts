@@ -1,12 +1,13 @@
 /**
- * `terpmail.umd.edu` and `rx.umaryland.edu` are listed in their own right because
- * matching is exact: every other `umd.edu` or `umaryland.edu` subdomain stays ineligible.
+ * `terpmail.umd.edu`, `rx.umaryland.edu`, and `rx.maryland.edu` are named explicitly
+ * because matching is exact: listing one campus subdomain must not admit any other subdomain.
  */
 export const CAMPUS_DOMAINS = [
   "umd.edu",
   "terpmail.umd.edu",
   "umaryland.edu",
   "rx.umaryland.edu",
+  "rx.maryland.edu",
 ] as const
 
 export type CampusDomain = (typeof CAMPUS_DOMAINS)[number]
@@ -15,6 +16,7 @@ export type CampusUniversityId = "umd" | "umb"
 const UMB_CAMPUS_DOMAINS = new Set<CampusDomain>([
   "umaryland.edu",
   "rx.umaryland.edu",
+  "rx.maryland.edu",
 ])
 
 /**

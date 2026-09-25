@@ -1,0 +1,122 @@
+[
+  {
+    "name": "exact interest and availability",
+    "profile": {
+      "interests": ["coffee"],
+      "availabilityBlocks": ["weekday_afternoon"],
+      "comfortSize": "either",
+      "safetyPreference": "none",
+      "universityId": "umd"
+    },
+    "activity": {
+      "category": "coffee",
+      "availabilityBlock": "weekday_afternoon",
+      "comfortSize": "medium",
+      "safetyPreference": "none",
+      "universityId": "umd",
+      "status": "approved",
+      "joined": false
+    },
+    "expected": { "total": 100, "eligible": true }
+  },
+  {
+    "name": "interest only",
+    "profile": {
+      "interests": ["coffee"],
+      "availabilityBlocks": ["weekend_morning"],
+      "comfortSize": "medium",
+      "safetyPreference": "none",
+      "universityId": "umd"
+    },
+    "activity": {
+      "category": "coffee",
+      "availabilityBlock": "weekday_afternoon",
+      "comfortSize": "medium",
+      "safetyPreference": "none",
+      "universityId": "umd",
+      "status": "approved",
+      "joined": false
+    },
+    "expected": { "total": 71, "eligible": true }
+  },
+  {
+    "name": "availability only",
+    "profile": {
+      "interests": ["games"],
+      "availabilityBlocks": ["weekday_afternoon"],
+      "comfortSize": "small",
+      "safetyPreference": "none",
+      "universityId": "umd"
+    },
+    "activity": {
+      "category": "coffee",
+      "availabilityBlock": "weekday_afternoon",
+      "comfortSize": "small",
+      "safetyPreference": "none",
+      "universityId": "umd",
+      "status": "approved",
+      "joined": false
+    },
+    "expected": { "total": 63, "eligible": true }
+  },
+  {
+    "name": "wrong university",
+    "profile": {
+      "interests": ["coffee"],
+      "availabilityBlocks": ["weekday_afternoon"],
+      "comfortSize": "either",
+      "safetyPreference": "none",
+      "universityId": "umd"
+    },
+    "activity": {
+      "category": "coffee",
+      "availabilityBlock": "weekday_afternoon",
+      "comfortSize": "medium",
+      "safetyPreference": "none",
+      "universityId": "umb",
+      "status": "approved",
+      "joined": false
+    },
+    "expected": { "total": 100, "eligible": false }
+  },
+  {
+    "name": "unapproved activity",
+    "profile": {
+      "interests": ["coffee"],
+      "availabilityBlocks": ["weekday_afternoon"],
+      "comfortSize": "either",
+      "safetyPreference": "none",
+      "universityId": "umd"
+    },
+    "activity": {
+      "category": "coffee",
+      "availabilityBlock": "weekday_afternoon",
+      "comfortSize": "medium",
+      "safetyPreference": "none",
+      "universityId": "umd",
+      "status": "pending",
+      "joined": false
+    },
+    "expected": { "total": 100, "eligible": false }
+  },
+  {
+    "name": "already joined",
+    "profile": {
+      "interests": ["coffee"],
+      "availabilityBlocks": ["weekday_afternoon"],
+      "comfortSize": "either",
+      "safetyPreference": "none",
+      "universityId": "umd"
+    },
+    "activity": {
+      "category": "coffee",
+      "availabilityBlock": "weekday_afternoon",
+      "comfortSize": "medium",
+      "safetyPreference": "none",
+      "universityId": "umd",
+      "status": "approved",
+      "joined": true
+    },
+    "expected": { "total": 100, "eligible": false }
+  }
+]

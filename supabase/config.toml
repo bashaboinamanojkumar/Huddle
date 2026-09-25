@@ -1,0 +1,13 @@
+project_id = "huddle-notifications"
+
+[api]
+port = 54321
+
+[db]
+port = 54322
+
+[studio]
+port = 54323
+
+[functions.send-push]
+verify_jwt = false

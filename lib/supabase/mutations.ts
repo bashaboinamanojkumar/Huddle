@@ -1,11 +1,21 @@
 import type { HuddleBrowserClient } from "@/lib/supabase/client"
 import {
+  toHuddleProfile,
   toChatMessage,
   toFriendConnection,
   toHuddleActivity,
+  toPulseResponseView,
+  toSafetyFlag,
   toSafetyReport,
 } from "@/lib/supabase/mappers"
-import { throwOnError } from "@/lib/supabase/queries"
+import {
+  ACTIVITY_COLUMNS,
+  CHAT_MESSAGE_COLUMNS,
+  FRIEND_CONNECTION_COLUMNS,
+  PROFILE_COLUMNS,
+  SAFETY_REPORT_COLUMNS,
+} from "@/lib/supabase/query-contracts"
+import { fetchProfileById, throwOnError } from "@/lib/supabase/queries"
 import type { TablesUpdate } from "@/lib/types/database"
 import type {
   ActivityStatus,
@@ -14,7 +24,9 @@ import type {
   FriendConnection,
   HuddleActivity,
   HuddleProfile,
+  PulseResponseView,
   RsvpStatus,
+  SafetyFlag,
   SafetyReport,
   UniversityId,
 } from "@/lib/types/huddle"
@@ -73,17 +85,28 @@ export async function updateProfile(
   supabase: HuddleBrowserClient,
   userId: string,
   updates: Partial<HuddleProfile>
-): Promise<void> {
+): Promise<HuddleProfile> {
   const patch = toProfileUpdate(updates)
-
-  if (Object.keys(patch).length > 0) {
-    const { error } = await supabase.from("profiles").update(patch).eq("id", userId)
-    throwOnError(error, "Could not save your profile")
-  }
 
   if (updates.gender !== undefined) {
     await saveGender(supabase, userId, updates.gender)
   }
+
+  if (Object.keys(patch).length > 0) {
+    const { data, error } = await supabase
+      .from("profiles")
+      .update(patch)
+      .eq("id", userId)
+      .select(PROFILE_COLUMNS)
+      .single()
+    throwOnError(error, "Could not save your profile")
+    if (!data) throw new Error("Could not save your profile")
+    return toHuddleProfile(data, updates.gender)
+  }
+
+  const profile = await fetchProfileById(supabase, userId)
+  if (!profile) throw new Error("Could not save your profile")
+  return { ...profile, gender: updates.gender }
 }
 
 async function saveGender(
@@ -102,8 +125,8 @@ export async function completeOnboarding(
   supabase: HuddleBrowserClient,
   userId: string,
   input: OnboardingPayload
-): Promise<void> {
-  await updateProfile(supabase, userId, {
+): Promise<HuddleProfile> {
+  return updateProfile(supabase, userId, {
     firstName: input.firstName,
     lastInitial: input.lastInitial,
     status: input.status,
@@ -168,7 +191,7 @@ export async function createActivity(
       safety_preference: input.safetyPreference,
       university_id: universityId,
     })
-    .select("*")
+    .select(ACTIVITY_COLUMNS)
     .single()
 
   throwOnError(error, "Could not create the activity")
@@ -189,7 +212,7 @@ export async function sendMessage(
   const { data, error } = await supabase
     .from("messages")
     .insert({ activity_id: activityId, user_id: userId, body })
-    .select("*")
+    .select(CHAT_MESSAGE_COLUMNS)
     .single()
 
   throwOnError(error, "Could not send the message")
@@ -214,7 +237,7 @@ export async function reportSafetyConcern(
       reported_user_id: reportedUserId ?? null,
       context,
     })
-    .select("*")
+    .select(SAFETY_REPORT_COLUMNS)
     .single()
 
   throwOnError(error, "Could not send the report")
@@ -230,37 +253,42 @@ export async function resolveFlag(
   supabase: HuddleBrowserClient,
   flagId: string,
   status: FlagStatus
-): Promise<void> {
-  const { error } = await supabase.rpc("resolve_flag", {
+): Promise<SafetyFlag> {
+  const { data, error } = await supabase.rpc("resolve_flag", {
     p_flag_id: flagId,
     p_status: status,
   })
 
   throwOnError(error, "Could not resolve the flag")
+  if (!data) throw new Error("Could not resolve the flag")
+  return toSafetyFlag(data)
 }
 
 export async function reviewActivity(
   supabase: HuddleBrowserClient,
   activityId: string,
   status: Extract<ActivityStatus, "approved" | "rejected">
-): Promise<void> {
-  const { error } = await supabase.rpc("review_activity", {
+): Promise<HuddleActivity> {
+  const { data, error } = await supabase.rpc("review_activity", {
     p_activity_id: activityId,
     p_status: status,
   })
 
   throwOnError(error, "Could not review the activity")
+  if (!data) throw new Error("Could not review the activity")
+  return toHuddleActivity(data)
 }
 
 export async function addFriend(
   supabase: HuddleBrowserClient,
   userId: string,
-  friendId: string
+  friendId: string,
+  message?: string
 ): Promise<FriendConnection | null> {
   const { data, error } = await supabase
     .from("friend_connections")
-    .insert({ user_id: userId, friend_id: friendId })
-    .select("*")
+    .insert({ user_id: userId, friend_id: friendId, message: message ?? null } as any)
+    .select(FRIEND_CONNECTION_COLUMNS)
     .maybeSingle()
 
   // A duplicate request is a no-op rather than an error the student should see.
@@ -275,23 +303,80 @@ export async function addFriend(
 export async function acceptFriend(
   supabase: HuddleBrowserClient,
   connectionId: string
-): Promise<void> {
-  const { error } = await supabase
+): Promise<FriendConnection> {
+  const { data, error } = await supabase
     .from("friend_connections")
     .update({ status: "accepted" })
     .eq("id", connectionId)
+    .select(FRIEND_CONNECTION_COLUMNS)
+    .single()
 
   throwOnError(error, "Could not accept the friend request")
+  if (!data) throw new Error("Could not accept the friend request")
+  return toFriendConnection(data)
 }
 
 export async function declineFriend(
   supabase: HuddleBrowserClient,
   connectionId: string
-): Promise<void> {
-  const { error } = await supabase
+): Promise<FriendConnection> {
+  const { data, error } = await supabase
     .from("friend_connections")
     .delete()
     .eq("id", connectionId)
+    .select(FRIEND_CONNECTION_COLUMNS)
+    .single()
 
   throwOnError(error, "Could not decline the friend request")
+  if (!data) throw new Error("Could not decline the friend request")
+  return toFriendConnection(data)
+}
+
+export async function submitPulseResponse(
+  supabase: HuddleBrowserClient,
+  activityId: string,
+  didMeet: boolean,
+  rating: number | null,
+): Promise<PulseResponseView> {
+  const args = rating === null
+    ? { p_activity_id: activityId, p_did_meet: didMeet }
+    : { p_activity_id: activityId, p_did_meet: didMeet, p_rating: rating }
+  const { data, error } = await supabase.rpc("submit_pulse_response", args)
+
+  throwOnError(error, "Could not save your private response")
+  if (!data) throw new Error("Could not save your private response")
+
+  return toPulseResponseView(data)
+}
+
+export async function sendDirectMessage(
+  supabase: HuddleBrowserClient,
+  receiverId: string,
+  body: string
+): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { error } = await supabase
+  .from('direct_messages' as any)
+  .insert({ sender_id: user.id, receiver_id: receiverId, body })
+
+  throwOnError(error, 'Could not send message')
+}
+
+export async function unfriend(
+  supabase: HuddleBrowserClient,
+  userId: string,
+  friendId: string
+): Promise<string> {
+  const { error } = await supabase
+    .from("friend_connections")
+    .delete()
+    .or(
+      `and(user_id.eq.${userId},friend_id.eq.${friendId}),`
+      + `and(user_id.eq.${friendId},friend_id.eq.${userId})`
+    )
+
+  throwOnError(error, "Could not unfriend")
+  return friendId
 }

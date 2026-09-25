@@ -1,10 +1,12 @@
 "use client"
 
-import { useMemo } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import { ChevronRight, Share2, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 import { ActivityCard } from "@/components/huddle/activity-card"
+import { HuddleWordmark } from "@/components/huddle/huddle-icons"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 import { useHuddle } from "@/lib/store/huddle-store"
 
 export default function FeedPage() {
@@ -72,41 +74,42 @@ export default function FeedPage() {
 
   const invite = () => toast("Invite link copied for the pilot demo.")
 
-  const sendRequest = async (friendId: string) => {
+  const sendRequest = async (friendId: string, message?: string) => {
     try {
-      await addFriend(friendId)
-      toast.success("Friend request sent.")
+      await addFriend(friendId, message)
+      toast.success("Friend request sent!")
+      setFriendMessage("")
+      setSendingTo(null)
     } catch {
-      toast.error("Could not send the request. Please try again.")
+      toast.error("Could not send request.")
     }
   }
+  const [friendMessage, setFriendMessage] = useState("")
+  const [sendingTo, setSendingTo] = useState<string | null>(null)
 
   return (
     <div className="min-h-full bg-background">
-      <header className="hero-gradient safe-pt rounded-b-[2.5rem] px-5 pb-6">
+      <header className="glass-card safe-pt rounded-b-[2.5rem] px-5 pb-6">
         <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <img src="/huddle-icon.png" alt="Huddle" className="h-10 w-10 object-contain" />
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/62">Huddle</p>
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/8">
+              <img src="/huddle-icon.png" alt="" className="h-10 w-10 object-contain" />
             </div>
-            <h1 className="font-heading text-3xl font-black leading-none text-white">
-              Hey, {currentProfile.firstName} 👋
-            </h1>
-            <p className="mt-1 text-sm text-white/62">Discover events, connect with people, and huddle up together.</p>
+            <HuddleWordmark className="text-lg text-white" />
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <button
               type="button"
               onClick={invite}
-              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/16 text-white"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-white/8 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               aria-label="Invite friends"
             >
-              <Share2 className="h-5 w-5" />
+              <Share2 className="h-5 w-5" aria-hidden="true" />
             </button>
             <Link
               href="/app/profile"
-              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white"
+              className="flex h-12 w-12 items-center justify-center rounded-full border border-white/25 text-sm font-black text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-secondary focus-visible:ring-offset-2 focus-visible:ring-offset-black"
               style={{ backgroundColor: currentProfile.photoColor }}
               aria-label="Open profile"
             >
@@ -115,16 +118,21 @@ export default function FeedPage() {
           </div>
         </div>
 
+        <h1 className="mt-4 font-heading text-3xl font-black leading-none text-white">
+          Hey, {currentProfile.firstName} 👋
+        </h1>
+        <p className="mt-1 text-sm text-white/62">Good to see you. Here's what's happening.</p>
+
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{attendingActivities.length}</p>
             <p className="text-[11px] text-white/62">attending</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.streakDays}</p>
             <p className="text-[11px] text-white/62">day streak</p>
           </div>
-          <div className="rounded-3xl bg-black/18 p-3">
+          <div className="rounded-3xl bg-white/8 p-3">
             <p className="font-heading text-2xl font-black text-white">{currentProfile.points}</p>
             <p className="text-[11px] text-white/62">points</p>
           </div>
@@ -163,7 +171,7 @@ export default function FeedPage() {
         </section>
 
         <section>
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <h2 className="font-heading text-xl font-black text-white">Same wavelength</h2>
             <span className="text-xs text-white/46">{leaderboard.length} students</span>
           </div>
@@ -324,26 +332,45 @@ export default function FeedPage() {
             <h2 className="font-heading text-xl font-black text-white mb-3">You might know</h2>
             <div className="glass-card rounded-[2rem] overflow-hidden">
               {suggestions.map((profile) => (
-                <div key={profile.userId} className="flex items-center justify-between border-b border-white/8 px-4 py-3 last:border-b-0">
-                  <Link href={`/app/profile/${profile.userId}`} className="flex items-center gap-3 flex-1">
-                    <span
-                      className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
-                      style={{ backgroundColor: profile.photoColor }}
+                <div key={profile.userId} className="border-b border-white/8 last:border-b-0">
+                  <div className="flex items-center justify-between px-4 py-3">
+                    <Link href={`/app/profile/${profile.userId}`} className="flex items-center gap-3 flex-1">
+                      <span
+                        className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-white"
+                        style={{ backgroundColor: profile.photoColor }}
+                      >
+                        {profile.displayName.charAt(0)}
+                      </span>
+                      <div>
+                        <p className="text-sm font-bold text-white">{profile.displayName}</p>
+                        <p className="text-xs text-white/42">{profile.meetupsThisWeek} meetups this week</p>
+                      </div>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => setSendingTo(sendingTo === profile.userId ? null : profile.userId)}
+                      className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
                     >
-                      {profile.displayName.charAt(0)}
-                    </span>
-                    <div>
-                      <p className="text-sm font-bold text-white">{profile.displayName}</p>
-                      <p className="text-xs text-white/42">{profile.meetupsThisWeek} meetups this week</p>
+                      {sendingTo === profile.userId ? "Cancel" : "Add"}
+                    </button>
+                  </div>
+                  {sendingTo === profile.userId && (
+                    <div className="px-4 pb-3 flex gap-2">
+                      <input
+                        value={friendMessage}
+                        onChange={(e) => setFriendMessage(e.target.value)}
+                        placeholder="Add a message (optional)"
+                        className="flex-1 rounded-2xl border border-white/10 bg-white/8 px-3 py-2 text-sm text-white outline-none placeholder:text-white/34"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => void sendRequest(profile.userId, friendMessage)}
+                        className="rounded-xl bg-secondary px-3 py-2 text-xs font-bold text-secondary-foreground"
+                      >
+                        Send
+                      </button>
                     </div>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => void sendRequest(profile.userId)}
-                    className="rounded-xl bg-white/10 px-3 py-2 text-xs font-bold text-white"
-                  >
-                    Add
-                  </button>
+                  )}
                 </div>
               ))}
             </div>
