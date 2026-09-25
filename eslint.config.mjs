@@ -5,8 +5,10 @@ export default [
   {
     ignores: [
       ".next/**",
+      ".worktrees/**",
       "node_modules/**",
       "public/sw.js",
+      "outputs/**",
       "_docx_extracted.xml",
       "**/*.docx",
     ],

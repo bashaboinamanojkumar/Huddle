@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArrowRight, Check, GraduationCap, ShieldCheck, Sparkles } from "lucide-react"
+import { ArrowRight, Check, GraduationCap, ShieldCheck } from "lucide-react"
 import { toast } from "sonner"
 import { CategoryIcon } from "@/components/huddle/category-icon"
 import { availabilityMeta, categoryMeta } from "@/lib/data/metadata"

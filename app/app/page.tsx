@@ -2,14 +2,13 @@
 
 import { useMemo } from "react"
 import Link from "next/link"
-import { CalendarHeart, ChevronRight, Share2, UserPlus, UsersRound } from "lucide-react"
+import { ChevronRight, Share2, UserPlus } from "lucide-react"
 import { toast } from "sonner"
 import { ActivityCard } from "@/components/huddle/activity-card"
 import { useHuddle } from "@/lib/store/huddle-store"
-import { formatActivityDate, formatActivityTime } from "@/lib/format"
 
 export default function FeedPage() {
-  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend, refresh } = useHuddle()
+  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend } = useHuddle()
 
   const attendingActivities = useMemo(
     () => approvedActivities.filter((a) => a.userRsvp?.status === "going"),
@@ -30,14 +29,6 @@ export default function FeedPage() {
         .map((f) => f.userId === currentUserId ? f.friendId : f.userId)
     ),
     [state.friends, currentUserId]
-  )
-
-  const myFriends = useMemo(
-    () => state.friends
-      .filter((f) => f.userId === currentUserId)
-      .map((f) => ({ connection: f, profile: state.profiles.find((p) => p.userId === f.friendId) }))
-      .filter((item) => item.profile),
-    [state.friends, state.profiles, currentUserId]
   )
 
   const incomingRequests = useMemo(
