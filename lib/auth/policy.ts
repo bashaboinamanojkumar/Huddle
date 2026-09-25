@@ -1,15 +1,23 @@
 /**
- * `terpmail.umd.edu` and `rx.maryland.edu` are named explicitly because matching is exact:
- * listing one campus subdomain must not admit any other subdomain automatically.
+ * `terpmail.umd.edu`, `rx.umaryland.edu`, and `rx.maryland.edu` are named explicitly
+ * because matching is exact: listing one campus subdomain must not admit any other subdomain.
  */
 export const CAMPUS_DOMAINS = [
   "umd.edu",
   "terpmail.umd.edu",
   "umaryland.edu",
+  "rx.umaryland.edu",
   "rx.maryland.edu",
 ] as const
 
 export type CampusDomain = (typeof CAMPUS_DOMAINS)[number]
+export type CampusUniversityId = "umd" | "umb"
+
+const UMB_CAMPUS_DOMAINS = new Set<CampusDomain>([
+  "umaryland.edu",
+  "rx.umaryland.edu",
+  "rx.maryland.edu",
+])
 
 /**
  * Copy that has to name every eligible domain is built from `CAMPUS_DOMAINS`, so adding one
@@ -133,17 +141,6 @@ export function normalizeCampusEmail(value: string): string | null {
   return normalized
 }
 
-export function isEligibleCampusEmail(value: string): boolean {
-  return normalizeCampusEmail(value) !== null
-}
-
-export type CampusUniversityId = "umd" | "umb"
-
-const UMB_CAMPUS_DOMAINS = new Set<CampusDomain>([
-  "umaryland.edu",
-  "rx.maryland.edu",
-])
-
 export function campusUniversityForEmail(value: string): CampusUniversityId | null {
   const normalized = normalizeCampusEmail(value)
   if (!normalized) {
@@ -152,6 +149,10 @@ export function campusUniversityForEmail(value: string): CampusUniversityId | nu
 
   const domain = normalized.slice(normalized.lastIndexOf("@") + 1) as CampusDomain
   return UMB_CAMPUS_DOMAINS.has(domain) ? "umb" : "umd"
+}
+
+export function isEligibleCampusEmail(value: string): boolean {
+  return normalizeCampusEmail(value) !== null
 }
 
 export const GOOGLE_PROVIDER = "google"

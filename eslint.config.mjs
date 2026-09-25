@@ -5,9 +5,11 @@ export default [
   {
     ignores: [
       ".next/**",
+      ".worktrees/**",
       "node_modules/**",
       "output/playwright/**",
       "public/sw.js",
+      "outputs/**",
       "supabase/.temp/**",
       "supabase/functions/**",
       "_docx_extracted.xml",

@@ -16,6 +16,7 @@ describe("campus email policy", () => {
     [" Student@UMD.EDU ", "student@umd.edu"],
     [" Terp@TerpMail.UMD.EDU ", "terp@terpmail.umd.edu"],
     ["researcher@umaryland.edu", "researcher@umaryland.edu"],
+    [" Yuqi.Zhou@RX.UMARYLAND.EDU ", "yuqi.zhou@rx.umaryland.edu"],
     [" Pharmacy@RX.MARYLAND.EDU ", "pharmacy@rx.maryland.edu"],
   ])("accepts and normalizes exact eligible domains", (input, expected) => {
     expect(normalizeCampusEmail(input)).toBe(expected)
@@ -36,6 +37,9 @@ describe("campus email policy", () => {
     "student@mail.terpmail.umd.edu",
     "student@evilterpmail.umd.edu",
     "student@terpmail.umd.edu.evil.test",
+    "student@mail.rx.umaryland.edu",
+    "student@evilrx.umaryland.edu",
+    "student@rx.umaryland.edu.evil.test",
     "student@mail.rx.maryland.edu",
     "student@evilrx.maryland.edu",
     "student@rx.maryland.edu.evil.test",
@@ -51,10 +55,10 @@ describe("campus email policy", () => {
       expect(listed).toContain(`@${domain}`)
     })
     expect(listed).toBe(
-      "@umd.edu, @terpmail.umd.edu, @umaryland.edu, or @rx.maryland.edu"
+      "@umd.edu, @terpmail.umd.edu, @umaryland.edu, @rx.umaryland.edu, or @rx.maryland.edu"
     )
     expect(formatCampusDomains("and")).toBe(
-      "@umd.edu, @terpmail.umd.edu, @umaryland.edu, and @rx.maryland.edu"
+      "@umd.edu, @terpmail.umd.edu, @umaryland.edu, @rx.umaryland.edu, and @rx.maryland.edu"
     )
   })
 })
@@ -72,6 +76,22 @@ describe("campus assignment", () => {
   it("does not classify an ineligible domain", () => {
     expect(campusUniversityForEmail("student@mail.rx.maryland.edu")).toBeNull()
   })
+
+  it.each([
+    ["student@umd.edu", "umd"],
+    ["student@terpmail.umd.edu", "umd"],
+    ["student@umaryland.edu", "umb"],
+    [" Yuqi.Zhou@RX.UMARYLAND.EDU ", "umb"],
+  ])("maps eligible campus email %s to %s", (input, expected) => {
+    expect(campusUniversityForEmail(input)).toBe(expected)
+  })
+
+  it.each(["student@mail.rx.umaryland.edu", "student@rx.umaryland.edu.evil.test"])(
+    "does not map an ineligible campus email: %s",
+    (input) => {
+      expect(campusUniversityForEmail(input)).toBeNull()
+    }
+  )
 })
 
 describe("return path policy", () => {
@@ -117,7 +137,7 @@ describe("stable authentication errors", () => {
       session_expired: "Your session expired. Sign in again to continue.",
       sign_in_required: "Sign in with your campus account to continue.",
       invalid_campus_email:
-        "Enter your @umd.edu, @terpmail.umd.edu, @umaryland.edu, or @rx.maryland.edu campus email address.",
+        "Enter your @umd.edu, @terpmail.umd.edu, @umaryland.edu, @rx.umaryland.edu, or @rx.maryland.edu campus email address.",
       invalid_credentials: "That email and password combination is incorrect.",
       email_not_confirmed: "Confirm your campus email from the link we sent, then sign in.",
       weak_password: "Use a password of at least 8 characters.",

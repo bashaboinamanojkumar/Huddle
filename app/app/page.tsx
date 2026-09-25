@@ -10,7 +10,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell"
 import { useHuddle } from "@/lib/store/huddle-store"
 
 export default function FeedPage() {
-  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend, unfriend, sendDirectMessage, refresh } = useHuddle()
+  const { approvedActivities, currentProfile, currentUserId, state, addFriend, acceptFriend, declineFriend } = useHuddle()
 
   const attendingActivities = useMemo(
     () => approvedActivities.filter((a) => a.userRsvp?.status === "going"),
