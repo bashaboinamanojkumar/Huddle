@@ -38,4 +38,4 @@ supabase/schema.sql
 # Environment files: ignore every variant, keep the checked-in template.
 # The negation must stay after the wildcard or it has no effect.
 .env*
-.env.example
+.env.local
