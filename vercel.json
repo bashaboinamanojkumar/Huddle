@@ -1,0 +1,19 @@
+
+{
+  "functions": {
+    "app/api/terplink/sync/route.ts": {
+      "maxDuration": 30
+    }
+  },
+  "headers": [
+    {
+      "source": "/api/terplink/sync",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, no-cache"
+        }
+      ]
+    }
+  ]
+}
