@@ -1,17 +1,15 @@
-
 {
-  "functions": {
-    "app/api/terplink/sync/route.ts": {
-      "maxDuration": 30
-    }
-  },
   "headers": [
     {
-      "source": "/api/terplink/sync",
+      "source": "/api/(.*)",
       "headers": [
         {
           "key": "Cache-Control",
-          "value": "no-store, no-cache"
+          "value": "no-store, max-age=0"
+        },
+        {
+          "key": "x-vercel-cache",
+          "value": "BYPASS"
         }
       ]
     }
